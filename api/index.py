@@ -113,7 +113,7 @@ def rsvp_page():
         guest = cur.fetchone()
         conn.close()
         if guest:
-            prefill_script = f'<script>localStorage.setItem(STORAGE_KEY,{json.dumps(guest["name"])});location.href="/rsvp";</script>'
+            prefill_script = f'<script>localStorage.setItem("krish_james_party_v2_name",{json.dumps(guest["name"])});location.href="/rsvp";</script>'
             html = MAIN_HTML.replace('</body>', prefill_script + '</body>')
             return make_response(html, 200, {"Content-Type": "text/html; charset=utf-8"})
     return make_response(MAIN_HTML, 200, {"Content-Type": "text/html; charset=utf-8"})
