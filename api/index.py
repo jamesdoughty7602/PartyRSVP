@@ -1379,8 +1379,11 @@ ADMIN_HTML = r"""<!DOCTYPE html>
       chips.innerHTML = '<span class="empty-text">No guests added yet. Add names above.</span>';
     } else {
       chips.innerHTML = data.guest_list.map(g =>
-        '<span class="chip">' + esc(g.name) + ' <button class="remove" onclick="removeGuest(\'' + esc(g.name).replace(/'/g, "\\'") + '\')">&times;</button></span>'
+        '<span class="chip">' + esc(g.name) + ' <button class="remove" data-name="' + esc(g.name).replace(/"/g, '&quot;') + '">&times;</button></span>'
       ).join('');
+      chips.querySelectorAll('.remove[data-name]').forEach(btn => {
+        btn.onclick = () => removeGuest(btn.getAttribute('data-name'));
+      });
     }
 
     const pending = data.rsvps.filter(r => r.approved === 0);
@@ -1448,8 +1451,8 @@ ADMIN_HTML = r"""<!DOCTYPE html>
 
   async function addGuest() {
     const input = document.getElementById('add-name');
-    const name = input.value.trim();
-    if (!name) return;
+    const name = input.value.trim().replace(/[^a-zA-Z\s\-']/g, '').replace(/\s+/g, ' ').trim();
+    if (!name) { input.value = ''; return; }
     const res = await fetch('/api/admin/guest-list', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
