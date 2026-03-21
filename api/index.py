@@ -91,6 +91,15 @@ def init_db():
     cur.execute("SELECT id FROM guest_list WHERE invite_token IS NULL")
     for row in cur.fetchall():
         cur.execute("UPDATE guest_list SET invite_token = %s WHERE id = %s", (secrets.token_urlsafe(12), row["id"]))
+    # Backfill invite tokens for approved plus ones that don't have one
+    cur.execute("SELECT id, name, phone FROM plus_ones WHERE approved = 1 AND (invite_token IS NULL OR invite_token = '')")
+    for row in cur.fetchall():
+        token = secrets.token_urlsafe(12)
+        cur.execute("UPDATE plus_ones SET invite_token = %s WHERE id = %s", (token, row["id"]))
+        # Also ensure they have an RSVP entry
+        cur.execute("SELECT id FROM rsvps WHERE LOWER(name) = LOWER(%s)", (row["name"],))
+        if not cur.fetchone():
+            cur.execute("INSERT INTO rsvps (name, status, approved, phone) VALUES (%s, 'maybe', 1, %s)", (row["name"], row["phone"] or ""))
     conn.commit()
     conn.close()
 
@@ -1545,7 +1554,7 @@ ADMIN_HTML = r"""<!DOCTYPE html>
       <p style="color:#777;font-size:14px;margin-bottom:16px;">Share invite links with approved plus ones so they can see party details and update their RSVP.</p>
       <div style="overflow-x:auto">
         <table>
-          <thead><tr><th>Plus One Name</th><th>Added By</th><th>Phone</th><th>RSVP Status</th><th>Invite Link</th></tr></thead>
+          <thead><tr><th>Guest Name</th><th>RSVP Status</th><th>Invite Link</th></tr></thead>
           <tbody id="plusone-invite-table"></tbody>
         </table>
       </div>
@@ -1889,7 +1898,7 @@ ADMIN_HTML = r"""<!DOCTYPE html>
     const baseUrl = location.origin;
 
     if (plusOnes.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="5" class="empty-text">No approved plus ones yet.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="3" class="empty-text">No approved plus ones yet.</td></tr>';
       return;
     }
 
@@ -1901,10 +1910,19 @@ ADMIN_HTML = r"""<!DOCTYPE html>
       const inviteUrl = p.invite_token ? baseUrl + '/rsvp?invite=' + p.invite_token : '';
       const btnId = 'po-copy-' + p.id;
       const tokenTail = p.invite_token ? p.invite_token.slice(-6) : '';
-      const linkCell = inviteUrl
-        ? '<div style="display:flex;align-items:center;gap:8px"><button class="copy-btn" id="' + btnId + '" onclick="copyLink(\'' + esc(inviteUrl).replace(/'/g, "\\'") + '\',\'' + btnId + '\')" title="' + esc(inviteUrl) + '">Copy Link</button><span style="font-size:10px;color:#bbb;font-family:monospace">...' + esc(tokenTail) + '</span></div>'
-        : '<span class="no-rsvp">No link</span>';
-      return '<tr><td><strong>' + esc(p.name) + '</strong></td><td>' + esc(p.added_by) + '</td><td>' + esc(p.phone || '') + '</td><td>' + statusHtml + '</td><td>' + linkCell + '</td></tr>';
+      const mainRow = '<tr><td><strong>' + esc(p.name) + '</strong></td><td>' + statusHtml + '</td><td>' + (inviteUrl ? '<div style="display:flex;align-items:center;gap:8px"><button class="copy-btn" id="' + btnId + '" onclick="copyLink(\'' + esc(inviteUrl).replace(/'/g, "\\'") + '\',\'' + btnId + '\')" title="' + esc(inviteUrl) + '">Copy Link</button><span style="font-size:10px;color:#bbb;font-family:monospace">...' + esc(tokenTail) + '</span></div>' : '<span class="no-rsvp">No link</span>') + '</td></tr>';
+
+      const igVal = (rsvp && rsvp.instagram) || '';
+      const fbVal = (rsvp && rsvp.facebook) || '';
+      const phoneVal = p.phone || (rsvp && rsvp.phone) || '';
+      const hasIg = !!igVal;
+      const hasFb = !!fbVal;
+      const hasPhone = !!phoneVal;
+      const igTick = hasIg ? '<span style="color:#1a7a42;font-size:11px">&#10003;</span> ' : '<span style="color:#ccc;font-size:11px">&#10007;</span> ';
+      const fbTick = hasFb ? '<span style="color:#1a7a42;font-size:11px">&#10003;</span> ' : '<span style="color:#ccc;font-size:11px">&#10007;</span> ';
+      const phoneTick = hasPhone ? '<span style="color:#1a7a42;font-size:11px">&#10003;</span> ' : '<span style="color:#ccc;font-size:11px">&#10007;</span> ';
+      const detailsRow = '<tr><td colspan="3" style="padding:4px 12px 14px;border-bottom:2px solid #eee"><div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:4px"><span style="font-size:11px;color:#999;font-weight:600">ADDED BY:</span><span style="font-size:12px">' + esc(p.added_by) + '</span><span style="font-size:11px;color:#999;font-weight:600;margin-left:8px">PHONE:</span><span style="font-size:12px">' + esc(phoneVal || 'Not provided') + '</span></div><div style="display:flex;gap:12px;font-size:11px;font-weight:600">' + igTick + 'IG ' + fbTick + 'FB ' + phoneTick + 'Phone</div></td></tr>';
+      return mainRow + detailsRow;
     }).join('');
   }
 
