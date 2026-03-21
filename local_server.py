@@ -473,6 +473,40 @@ class Handler(BaseHTTPRequestHandler):
             conn.close()
             json_response(self, 200, {"ok": True})
 
+        elif self.path == "/api/admin/update-plusone-details":
+            if not check_admin_session(self.headers.get("Cookie")):
+                json_response(self, 401, {"error": "Unauthorized"})
+                return
+            body = read_body(self)
+            po_id = body.get("id")
+            instagram = body.get("instagram", "").strip()
+            facebook = body.get("facebook", "").strip()
+            phone = body.get("phone", "").strip()
+            if not po_id:
+                json_response(self, 400, {"error": "Plus one ID is required"})
+                return
+            conn = get_db()
+            if phone:
+                conn.execute("UPDATE plus_ones SET phone = ? WHERE id = ?", (phone, po_id))
+            po = conn.execute("SELECT name FROM plus_ones WHERE id = ?", (po_id,)).fetchone()
+            if po:
+                rsvp = conn.execute("SELECT id FROM rsvps WHERE name = ? COLLATE NOCASE", (po["name"],)).fetchone()
+                if rsvp:
+                    updates = []
+                    params = []
+                    if instagram:
+                        updates.append("instagram = ?"); params.append(instagram)
+                    if facebook:
+                        updates.append("facebook = ?"); params.append(facebook)
+                    if phone:
+                        updates.append("phone = ?"); params.append(phone)
+                    if updates:
+                        params.append(rsvp["id"])
+                        conn.execute("UPDATE rsvps SET " + ", ".join(updates) + " WHERE id = ?", params)
+            conn.commit()
+            conn.close()
+            json_response(self, 200, {"ok": True})
+
         elif self.path == "/api/admin/send-alert":
             if not check_admin_session(self.headers.get("Cookie")):
                 json_response(self, 401, {"error": "Unauthorized"})
@@ -1906,7 +1940,7 @@ ADMIN_HTML = r"""<!DOCTYPE html>
       const inviteUrl = p.invite_token ? baseUrl + '/?invite=' + p.invite_token : '';
       const btnId = 'po-copy-' + p.id;
       const tokenTail = p.invite_token ? p.invite_token.slice(-6) : '';
-      const mainRow = '<tr><td><strong>' + esc(p.name) + '</strong></td><td>' + statusHtml + '</td><td>' + (inviteUrl ? '<div style="display:flex;align-items:center;gap:8px"><button class="copy-btn" id="' + btnId + '" onclick="copyLink(\'' + esc(inviteUrl).replace(/'/g, "\\'") + '\',\'' + btnId + '\')" title="' + esc(inviteUrl) + '">Copy Link</button><span style="font-size:10px;color:#bbb;font-family:monospace">...' + esc(tokenTail) + '</span></div>' : '<span class="no-rsvp">No link</span>') + '</td></tr>';
+      const mainRow = '<tr><td><strong>' + esc(p.name) + '</strong><div style="font-size:10px;color:#999;margin-top:2px">Added by ' + esc(p.added_by) + '</div></td><td>' + statusHtml + '</td><td>' + (inviteUrl ? '<div style="display:flex;align-items:center;gap:8px"><button class="copy-btn" id="' + btnId + '" onclick="copyLink(\'' + esc(inviteUrl).replace(/'/g, "\\'") + '\',\'' + btnId + '\')" title="' + esc(inviteUrl) + '">Copy Link</button><span style="font-size:10px;color:#bbb;font-family:monospace">...' + esc(tokenTail) + '</span></div>' : '<span class="no-rsvp">No link</span>') + '</td></tr>';
 
       const igVal = (rsvp && rsvp.instagram) || '';
       const fbVal = (rsvp && rsvp.facebook) || '';
@@ -1914,10 +1948,14 @@ ADMIN_HTML = r"""<!DOCTYPE html>
       const hasIg = !!igVal;
       const hasFb = !!fbVal;
       const hasPhone = !!phoneVal;
-      const igTick = hasIg ? '<span style="color:#1a7a42;font-size:11px">&#10003;</span> ' : '<span style="color:#ccc;font-size:11px">&#10007;</span> ';
-      const fbTick = hasFb ? '<span style="color:#1a7a42;font-size:11px">&#10003;</span> ' : '<span style="color:#ccc;font-size:11px">&#10007;</span> ';
+      function socialLink(url, platform) {
+        if (!url) return '';
+        return url.startsWith('http') ? url : 'https://' + platform + '.com/' + url;
+      }
+      const igTick = hasIg ? '<a href="' + esc(socialLink(igVal, 'instagram')) + '" target="_blank" rel="noopener" style="color:#1a7a42;font-size:11px;text-decoration:none" title="Open profile">&#10003;</a> ' : '<span style="color:#ccc;font-size:11px">&#10007;</span> ';
+      const fbTick = hasFb ? '<a href="' + esc(socialLink(fbVal, 'facebook')) + '" target="_blank" rel="noopener" style="color:#1a7a42;font-size:11px;text-decoration:none" title="Open profile">&#10003;</a> ' : '<span style="color:#ccc;font-size:11px">&#10007;</span> ';
       const phoneTick = hasPhone ? '<span style="color:#1a7a42;font-size:11px">&#10003;</span> ' : '<span style="color:#ccc;font-size:11px">&#10007;</span> ';
-      const detailsRow = '<tr><td colspan="3" style="padding:4px 12px 14px;border-bottom:2px solid #eee"><div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:4px"><span style="font-size:11px;color:#999;font-weight:600">ADDED BY:</span><span style="font-size:12px">' + esc(p.added_by) + '</span><span style="font-size:11px;color:#999;font-weight:600;margin-left:8px">PHONE:</span><span style="font-size:12px">' + esc(phoneVal || 'Not provided') + '</span></div><div style="display:flex;gap:12px;font-size:11px;font-weight:600">' + igTick + 'IG ' + fbTick + 'FB ' + phoneTick + 'Phone</div></td></tr>';
+      const detailsRow = '<tr><td colspan="3" style="padding:4px 12px 14px;border-bottom:2px solid #eee"><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px"><span style="font-size:11px;color:#999;font-weight:600">SOCIALS & PHONE:</span></div><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px">' + igTick + '<input type="text" id="po-ig-' + p.id + '" value="' + esc(igVal).replace(/"/g, '&quot;') + '" placeholder="Instagram URL" style="padding:4px 8px;font-size:12px;border:1px solid #e8e6e3;border-radius:6px;flex:1;min-width:100px">' + fbTick + '<input type="text" id="po-fb-' + p.id + '" value="' + esc(fbVal).replace(/"/g, '&quot;') + '" placeholder="Facebook URL" style="padding:4px 8px;font-size:12px;border:1px solid #e8e6e3;border-radius:6px;flex:1;min-width:100px"></div><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">' + phoneTick + '<input type="text" id="po-phone-' + p.id + '" value="' + esc(phoneVal).replace(/"/g, '&quot;') + '" placeholder="Phone number" style="padding:4px 8px;font-size:12px;border:1px solid #e8e6e3;border-radius:6px;flex:1;min-width:100px"><button class="action-btn approve-btn" style="font-size:11px;padding:4px 10px" onclick="savePlusOneDetails(' + p.id + ')">Save</button></div></td></tr>';
       return mainRow + detailsRow;
     }).join('');
   }
@@ -1975,6 +2013,26 @@ ADMIN_HTML = r"""<!DOCTYPE html>
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: guestId, instagram, facebook, phone })
+      });
+      if (res.ok) {
+        showToast('Details saved!');
+        loadData();
+      }
+    } catch (e) { showToast('Failed to save'); }
+  }
+
+  async function savePlusOneDetails(poId) {
+    const igInput = document.getElementById('po-ig-' + poId);
+    const fbInput = document.getElementById('po-fb-' + poId);
+    const phoneInput = document.getElementById('po-phone-' + poId);
+    const instagram = igInput ? igInput.value.trim() : '';
+    const facebook = fbInput ? fbInput.value.trim() : '';
+    const phone = phoneInput ? phoneInput.value.trim() : '';
+    try {
+      const res = await fetch('/api/admin/update-plusone-details', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: poId, instagram, facebook, phone })
       });
       if (res.ok) {
         showToast('Details saved!');
