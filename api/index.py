@@ -70,9 +70,22 @@ def init_db():
         id SERIAL PRIMARY KEY,
         added_by TEXT NOT NULL,
         name TEXT NOT NULL,
+        phone TEXT DEFAULT '',
+        invite_token TEXT UNIQUE,
         approved INTEGER NOT NULL DEFAULT 0,
         created_at TIMESTAMP DEFAULT NOW()
     )""")
+    # Migrate: add phone and invite_token columns if missing
+    try:
+        cur.execute("ALTER TABLE plus_ones ADD COLUMN phone TEXT DEFAULT ''")
+        conn.commit()
+    except Exception:
+        conn.rollback()
+    try:
+        cur.execute("ALTER TABLE plus_ones ADD COLUMN invite_token TEXT UNIQUE")
+        conn.commit()
+    except Exception:
+        conn.rollback()
     conn.commit()
     # Backfill invite tokens for guests that don't have one
     cur.execute("SELECT id FROM guest_list WHERE invite_token IS NULL")
@@ -127,8 +140,12 @@ def rsvp_page():
     if invite_token:
         conn = get_db()
         cur = conn.cursor()
+        # Check guest_list first, then plus_ones
         cur.execute("SELECT name FROM guest_list WHERE invite_token = %s", (invite_token,))
         guest = cur.fetchone()
+        if not guest:
+            cur.execute("SELECT name FROM plus_ones WHERE invite_token = %s AND approved = 1", (invite_token,))
+            guest = cur.fetchone()
         conn.close()
         if guest:
             prefill_script = f'<script>window.__INVITE_NAME={json.dumps(guest["name"])};localStorage.setItem("krish_james_party_v2_name",window.__INVITE_NAME);</script>'
@@ -185,10 +202,10 @@ def api_plus_ones():
         return jsonify({"plus_ones": []})
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("SELECT id, name, approved FROM plus_ones WHERE LOWER(added_by) = LOWER(%s) ORDER BY created_at DESC", (name,))
+    cur.execute("SELECT id, name, phone, approved FROM plus_ones WHERE LOWER(added_by) = LOWER(%s) ORDER BY created_at DESC", (name,))
     rows = cur.fetchall()
     conn.close()
-    return jsonify({"plus_ones": [{"id": r["id"], "name": r["name"], "approved": r["approved"] == 1, "denied": r["approved"] == -1} for r in rows]})
+    return jsonify({"plus_ones": [{"id": r["id"], "name": r["name"], "phone": r["phone"] or "", "approved": r["approved"] == 1, "denied": r["approved"] == -1} for r in rows]})
 
 
 @app.route("/")
@@ -208,7 +225,7 @@ def api_admin_data():
     guest_list = cur.fetchall()
     cur.execute("SELECT id, name, status, approved, instagram, facebook, phone, created_at, updated_at FROM rsvps ORDER BY created_at DESC")
     rsvps = cur.fetchall()
-    cur.execute("SELECT id, added_by, name, approved, created_at FROM plus_ones ORDER BY LOWER(added_by), created_at DESC")
+    cur.execute("SELECT id, added_by, name, phone, invite_token, approved, created_at FROM plus_ones ORDER BY LOWER(added_by), created_at DESC")
     plus_ones = cur.fetchall()
     conn.close()
     # Convert timestamps to strings
@@ -437,8 +454,11 @@ def api_plus_one():
     body = request.get_json(force=True)
     added_by = body.get("added_by", "").strip()
     name = body.get("name", "").strip()
+    phone = body.get("phone", "").strip()
     if not added_by or not name:
         return jsonify({"error": "Name is required"}), 400
+    if not phone:
+        return jsonify({"error": "Phone number is required for plus ones"}), 400
     conn = get_db()
     cur = conn.cursor()
     cur.execute("SELECT id FROM plus_ones WHERE LOWER(added_by) = LOWER(%s) AND LOWER(name) = LOWER(%s)", (added_by, name))
@@ -446,7 +466,7 @@ def api_plus_one():
     if existing:
         conn.close()
         return jsonify({"error": f"{name} is already on your plus one list"}), 409
-    cur.execute("INSERT INTO plus_ones (added_by, name) VALUES (%s, %s)", (added_by, name))
+    cur.execute("INSERT INTO plus_ones (added_by, name, phone) VALUES (%s, %s, %s)", (added_by, name, phone))
     conn.commit()
     conn.close()
     return jsonify({"ok": True}), 201
@@ -479,7 +499,16 @@ def api_admin_approve_plus_one():
     conn = get_db()
     cur = conn.cursor()
     if action == "approve":
-        cur.execute("UPDATE plus_ones SET approved = 1 WHERE id = %s", (plus_one_id,))
+        token = secrets.token_urlsafe(12)
+        cur.execute("UPDATE plus_ones SET approved = 1, invite_token = %s WHERE id = %s", (token, plus_one_id))
+        # Auto-RSVP the plus one as "Maybe"
+        cur.execute("SELECT name, phone FROM plus_ones WHERE id = %s", (plus_one_id,))
+        po = cur.fetchone()
+        if po:
+            cur.execute("SELECT id FROM rsvps WHERE LOWER(name) = LOWER(%s)", (po["name"],))
+            existing_rsvp = cur.fetchone()
+            if not existing_rsvp:
+                cur.execute("INSERT INTO rsvps (name, status, approved, phone) VALUES (%s, 'maybe', 1, %s)", (po["name"], po["phone"] or ""))
     elif action == "reject":
         cur.execute("UPDATE plus_ones SET approved = -1 WHERE id = %s", (plus_one_id,))
     conn.commit()
@@ -852,8 +881,9 @@ MAIN_HTML = r"""<!DOCTYPE html>
       <p>RSVP first to add plus ones.</p>
     </div>
     <div id="plusone-area" class="hidden">
-      <div class="add-plusone-form">
-        <input type="text" id="plusone-name" placeholder="Friend's full name" autocomplete="off">
+      <div class="add-plusone-form" style="flex-wrap:wrap">
+        <input type="text" id="plusone-name" placeholder="Friend's full name" autocomplete="off" style="flex:1;min-width:140px">
+        <input type="tel" id="plusone-phone" placeholder="Their phone number" autocomplete="off" style="flex:1;min-width:140px;padding:14px 16px;font-family:'DM Sans',sans-serif;font-size:15px;border:2px solid #e8e6e3;border-radius:14px;background:#faf9f7;outline:none">
         <button class="plusone-add-btn" onclick="addPlusOne()">Add</button>
       </div>
       <div id="plusone-list"></div>
@@ -1258,17 +1288,21 @@ MAIN_HTML = r"""<!DOCTYPE html>
     const name = getName();
     if (!name) return;
     const input = document.getElementById('plusone-name');
+    const phoneInput = document.getElementById('plusone-phone');
     const friendName = input.value.trim();
-    if (!friendName) return;
+    const friendPhone = phoneInput.value.trim();
+    if (!friendName) { showToast('Please enter their name'); return; }
+    if (!friendPhone) { showToast('Phone number is required for plus ones'); return; }
     try {
       const res = await fetch('/api/plus-one', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ added_by: name, name: friendName })
+        body: JSON.stringify({ added_by: name, name: friendName, phone: friendPhone })
       });
       const data = await res.json();
       if (!res.ok) { showToast(data.error || 'Failed to add'); return; }
       input.value = '';
+      phoneInput.value = '';
       showToast('&#10003; ' + escapeHtml(friendName) + ' added — pending approval');
       loadPlusOnes();
     } catch (e) { showToast('Something went wrong'); }
@@ -1288,6 +1322,9 @@ MAIN_HTML = r"""<!DOCTYPE html>
   }
 
   document.getElementById('plusone-name').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); document.getElementById('plusone-phone').focus(); }
+  });
+  document.getElementById('plusone-phone').addEventListener('keydown', e => {
     if (e.key === 'Enter') { e.preventDefault(); addPlusOne(); }
   });
 
@@ -1451,6 +1488,7 @@ ADMIN_HTML = r"""<!DOCTYPE html>
   <div class="admin-tabs">
     <button class="admin-tab active" onclick="showAdminTab('manage')">Manage</button>
     <button class="admin-tab" onclick="showAdminTab('invitelinks')">Guest Invite Links</button>
+    <button class="admin-tab" onclick="showAdminTab('plusonelinks')">Plus One Links</button>
     <button class="admin-tab" onclick="showAdminTab('guestlist')">Guest List</button>
   </div>
 
@@ -1495,6 +1533,20 @@ ADMIN_HTML = r"""<!DOCTYPE html>
         <table>
           <thead><tr><th>Guest Name</th><th>RSVP Status</th><th>Invite Link</th></tr></thead>
           <tbody id="invite-table"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- PLUS ONE INVITE LINKS TAB -->
+  <div class="admin-panel" id="panel-plusonelinks">
+    <div class="card">
+      <h2>&#128279; Plus One Invite Links</h2>
+      <p style="color:#777;font-size:14px;margin-bottom:16px;">Share invite links with approved plus ones so they can see party details and update their RSVP.</p>
+      <div style="overflow-x:auto">
+        <table>
+          <thead><tr><th>Plus One Name</th><th>Added By</th><th>Phone</th><th>RSVP Status</th><th>Invite Link</th></tr></thead>
+          <tbody id="plusone-invite-table"></tbody>
         </table>
       </div>
     </div>
@@ -1602,7 +1654,8 @@ ADMIN_HTML = r"""<!DOCTYPE html>
           if (p.approved !== 1) actions += '<button class="action-btn approve-btn" onclick="approvePlusOne(' + p.id + ')">Approve</button>';
           if (p.approved !== -1) actions += '<button class="action-btn reject-btn" onclick="rejectPlusOne(' + p.id + ')">Deny</button>';
           actions += '</div>';
-          html += '<div class="plusone-group-item"><span class="po-name">' + esc(p.name) + '</span>' + badge + actions + '</div>';
+          const phoneInfo = p.phone ? '<span style="font-size:12px;color:#777;margin-left:4px">(' + esc(p.phone) + ')</span>' : '';
+          html += '<div class="plusone-group-item"><span class="po-name">' + esc(p.name) + phoneInfo + '</span>' + badge + actions + '</div>';
         });
         html += '</div></div>';
       });
@@ -1688,13 +1741,16 @@ ADMIN_HTML = r"""<!DOCTYPE html>
   }
 
   function showAdminTab(tab) {
+    const tabs = ['manage','invitelinks','plusonelinks','guestlist'];
     document.querySelectorAll('.admin-tab').forEach((t, i) => {
-      t.classList.toggle('active', (tab === 'manage' && i === 0) || (tab === 'invitelinks' && i === 1) || (tab === 'guestlist' && i === 2));
+      t.classList.toggle('active', tab === tabs[i]);
     });
-    document.getElementById('panel-manage').classList.toggle('active', tab === 'manage');
-    document.getElementById('panel-invitelinks').classList.toggle('active', tab === 'invitelinks');
-    document.getElementById('panel-guestlist').classList.toggle('active', tab === 'guestlist');
+    tabs.forEach(t => {
+      const panel = document.getElementById('panel-' + t);
+      if (panel) panel.classList.toggle('active', tab === t);
+    });
     if (tab === 'invitelinks') renderInviteTable();
+    if (tab === 'plusonelinks') renderPlusOneInviteTable();
     if (tab === 'guestlist') { renderAdminGuestList(); renderPhoneList(); }
   }
 
@@ -1823,6 +1879,33 @@ ADMIN_HTML = r"""<!DOCTYPE html>
       }
       container.innerHTML = html;
     } catch (e) { console.error('Failed to load guest list', e); }
+  }
+
+  function renderPlusOneInviteTable() {
+    if (!_adminData) return;
+    const tbody = document.getElementById('plusone-invite-table');
+    const plusOnes = (_adminData.plus_ones || []).filter(p => p.approved === 1);
+    const rsvps = _adminData.rsvps;
+    const baseUrl = location.origin;
+
+    if (plusOnes.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" class="empty-text">No approved plus ones yet.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = plusOnes.map(p => {
+      const rsvp = rsvps.find(r => r.name.toLowerCase() === p.name.toLowerCase());
+      const statusHtml = rsvp
+        ? '<span class="status-badge status-' + rsvp.status + '">' + statusLabel(rsvp.status) + '</span>'
+        : '<span class="no-rsvp">Not yet</span>';
+      const inviteUrl = p.invite_token ? baseUrl + '/rsvp?invite=' + p.invite_token : '';
+      const btnId = 'po-copy-' + p.id;
+      const tokenTail = p.invite_token ? p.invite_token.slice(-6) : '';
+      const linkCell = inviteUrl
+        ? '<div style="display:flex;align-items:center;gap:8px"><button class="copy-btn" id="' + btnId + '" onclick="copyLink(\'' + esc(inviteUrl).replace(/'/g, "\\'") + '\',\'' + btnId + '\')" title="' + esc(inviteUrl) + '">Copy Link</button><span style="font-size:10px;color:#bbb;font-family:monospace">...' + esc(tokenTail) + '</span></div>'
+        : '<span class="no-rsvp">No link</span>';
+      return '<tr><td><strong>' + esc(p.name) + '</strong></td><td>' + esc(p.added_by) + '</td><td>' + esc(p.phone || '') + '</td><td>' + statusHtml + '</td><td>' + linkCell + '</td></tr>';
+    }).join('');
   }
 
   function renderPhoneList() {
