@@ -114,7 +114,7 @@ def rsvp_page():
         conn.close()
         if guest:
             prefill_script = f'<script>localStorage.setItem("krish_james_party_v2_name",{json.dumps(guest["name"])});</script>'
-            html = MAIN_HTML.replace('</body>', prefill_script + '</body>')
+            html = MAIN_HTML.replace('<head>', '<head>' + prefill_script, 1)
             return make_response(html, 200, {"Content-Type": "text/html; charset=utf-8"})
     return make_response(MAIN_HTML, 200, {"Content-Type": "text/html; charset=utf-8"})
 
