@@ -1483,7 +1483,7 @@ ADMIN_HTML = r"""<!DOCTYPE html>
       <p style="color:#777;font-size:14px;margin-bottom:16px;">Share unique invite links with each guest. Their name will be pre-filled when they open the link.</p>
       <div style="overflow-x:auto">
         <table>
-          <thead><tr><th>Guest Name</th><th>RSVP Status</th><th>Socials Pre-fill</th><th>Invite Link</th><th></th></tr></thead>
+          <thead><tr><th>Guest Name</th><th>RSVP Status</th><th>Invite Link</th><th></th></tr></thead>
           <tbody id="invite-table"></tbody>
         </table>
       </div>
@@ -1702,7 +1702,7 @@ ADMIN_HTML = r"""<!DOCTYPE html>
     const baseUrl = location.origin;
 
     if (guests.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="5" class="empty-text">No guests added yet. Add guests in the Manage tab.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="4" class="empty-text">No guests added yet. Add guests in the Manage tab.</td></tr>';
       return;
     }
 
@@ -1713,8 +1713,9 @@ ADMIN_HTML = r"""<!DOCTYPE html>
         : '<span class="no-rsvp">Not yet</span>';
       const inviteUrl = baseUrl + '/?invite=' + g.invite_token;
       const btnId = 'copy-' + g.id;
-      const socialsHtml = '<div style="display:flex;flex-direction:column;gap:4px"><input type="text" id="guest-ig-' + g.id + '" value="' + esc(g.instagram || '').replace(/"/g, '&quot;') + '" placeholder="Instagram" style="padding:4px 8px;font-size:12px;border:1px solid #e8e6e3;border-radius:6px;width:130px"><input type="text" id="guest-fb-' + g.id + '" value="' + esc(g.facebook || '').replace(/"/g, '&quot;') + '" placeholder="Facebook" style="padding:4px 8px;font-size:12px;border:1px solid #e8e6e3;border-radius:6px;width:130px"><button class="action-btn approve-btn" style="font-size:11px;padding:4px 8px" onclick="saveGuestSocials(' + g.id + ')">Save</button></div>';
-      return '<tr><td><strong>' + esc(g.name) + '</strong></td><td>' + statusHtml + '</td><td>' + socialsHtml + '</td><td><span class="invite-url" title="' + esc(inviteUrl) + '">' + esc(inviteUrl) + '</span></td><td><button class="copy-btn" id="' + btnId + '" onclick="copyLink(\'' + esc(inviteUrl).replace(/'/g, "\\'") + '\',\'' + btnId + '\')">Copy</button></td></tr>';
+      const mainRow = '<tr><td><strong>' + esc(g.name) + '</strong></td><td>' + statusHtml + '</td><td><span class="invite-url" title="' + esc(inviteUrl) + '">' + esc(inviteUrl) + '</span></td><td><button class="copy-btn" id="' + btnId + '" onclick="copyLink(\'' + esc(inviteUrl).replace(/'/g, "\\'") + '\',\'' + btnId + '\')">Copy</button></td></tr>';
+      const socialsRow = '<tr><td colspan="4" style="padding:4px 12px 16px;border-bottom:2px solid #eee"><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><span style="font-size:11px;color:#999;font-weight:600">PRE-FILL SOCIALS:</span><input type="text" id="guest-ig-' + g.id + '" value="' + esc(g.instagram || '').replace(/"/g, '&quot;') + '" placeholder="Instagram URL" style="padding:4px 8px;font-size:12px;border:1px solid #e8e6e3;border-radius:6px;flex:1;min-width:100px"><input type="text" id="guest-fb-' + g.id + '" value="' + esc(g.facebook || '').replace(/"/g, '&quot;') + '" placeholder="Facebook URL" style="padding:4px 8px;font-size:12px;border:1px solid #e8e6e3;border-radius:6px;flex:1;min-width:100px"><button class="action-btn approve-btn" style="font-size:11px;padding:4px 10px" onclick="saveGuestSocials(' + g.id + ')">Save</button></div></td></tr>';
+      return mainRow + socialsRow;
     }).join('');
   }
 
