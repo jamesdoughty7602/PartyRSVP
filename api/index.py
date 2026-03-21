@@ -799,6 +799,13 @@ MAIN_HTML = r"""<!DOCTYPE html>
         <label for="name-input">Your Name</label>
         <input type="text" id="name-input" placeholder="Enter your name" autocomplete="off" required>
       </div>
+      <div class="rsvp-buttons">
+        <button type="button" class="rsvp-btn going" onclick="submitRsvp('going')">Going &#127881;</button>
+        <button type="button" class="rsvp-btn maybe-btn" onclick="submitRsvp('maybe')">Maybe &#129300;</button>
+        <button type="button" class="rsvp-btn cant-go" onclick="submitRsvp('cant_go')">Can't Go</button>
+      </div>
+      <div class="error-msg" id="error-msg"></div>
+      <div id="status-area"></div>
       <div class="phone-section" id="phone-section">
       <div class="socials-header"><h3>Get party alerts &#128242;</h3></div>
       <p class="socials-prompt">Drop your number to stay in the loop on any updates! (optional)</p>
@@ -822,13 +829,6 @@ MAIN_HTML = r"""<!DOCTYPE html>
       </div>
       <button class="save-socials-btn" onclick="saveSocials()">Save Socials</button>
       </div>
-      <div class="rsvp-buttons">
-        <button type="button" class="rsvp-btn going" onclick="submitRsvp('going')">Going &#127881;</button>
-        <button type="button" class="rsvp-btn maybe-btn" onclick="submitRsvp('maybe')">Maybe &#129300;</button>
-        <button type="button" class="rsvp-btn cant-go" onclick="submitRsvp('cant_go')">Can't Go</button>
-      </div>
-      <div class="error-msg" id="error-msg"></div>
-      <div id="status-area"></div>
     </form>
   </div>
 
