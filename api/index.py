@@ -113,7 +113,7 @@ def rsvp_page():
         guest = cur.fetchone()
         conn.close()
         if guest:
-            prefill_script = f'<script>localStorage.setItem("krish_james_party_v2_name",{json.dumps(guest["name"])});</script>'
+            prefill_script = f'<script>window.__INVITE_NAME={json.dumps(guest["name"])};localStorage.setItem("krish_james_party_v2_name",window.__INVITE_NAME);</script>'
             html = MAIN_HTML.replace('<head>', '<head>' + prefill_script, 1)
             return make_response(html, 200, {"Content-Type": "text/html; charset=utf-8"})
     return make_response(MAIN_HTML, 200, {"Content-Type": "text/html; charset=utf-8"})
@@ -785,6 +785,7 @@ MAIN_HTML = r"""<!DOCTYPE html>
   })();
 
   const STORAGE_KEY = 'krish_james_party_v2_name';
+  function getName() { return window.__INVITE_NAME || getName(); }
   const AVATAR_COLORS = ['#ff6b9d','#c44dff','#6e8efb','#4dc9f6','#f39c12','#e74c3c','#27ae60','#8e44ad','#2980b9','#d35400','#16a085','#e84393','#6c5ce7','#00b894','#fdcb6e'];
   const STATUS_LABELS = { going: 'Going', maybe: 'Maybe', cant_go: "Can't Go" };
   const STATUS_EMOJI = { going: '&#127881;', maybe: '&#129300;', cant_go: '&#128532;' };
@@ -821,7 +822,7 @@ MAIN_HTML = r"""<!DOCTYPE html>
   }
 
   async function refreshMyStatus() {
-    const name = localStorage.getItem(STORAGE_KEY);
+    const name = getName();
     if (!name) return;
     const nameGroup = document.getElementById('name-group');
     nameGroup.innerHTML = '<div class="returning-name">' + escapeHtml(name) + '</div>';
@@ -866,7 +867,7 @@ MAIN_HTML = r"""<!DOCTYPE html>
       const data = await res.json();
       const pills = document.getElementById('count-pills');
       const container = document.getElementById('guest-list-container');
-      const myName = localStorage.getItem(STORAGE_KEY);
+      const myName = getName();
 
       pills.innerHTML = '';
       if (data.going_count > 0) pills.innerHTML += '<span class="count-pill going-pill">' + data.going_count + ' going</span>';
@@ -1087,7 +1088,7 @@ MAIN_HTML = r"""<!DOCTYPE html>
 
   // Plus Ones
   async function loadPlusOnes() {
-    const name = localStorage.getItem(STORAGE_KEY);
+    const name = getName();
     if (!name) {
       document.getElementById('plusone-login-prompt').classList.remove('hidden');
       document.getElementById('plusone-area').classList.add('hidden');
@@ -1114,7 +1115,7 @@ MAIN_HTML = r"""<!DOCTYPE html>
   }
 
   async function addPlusOne() {
-    const name = localStorage.getItem(STORAGE_KEY);
+    const name = getName();
     if (!name) return;
     const input = document.getElementById('plusone-name');
     const friendName = input.value.trim();
@@ -1134,7 +1135,7 @@ MAIN_HTML = r"""<!DOCTYPE html>
   }
 
   async function removePlusOne(id) {
-    const name = localStorage.getItem(STORAGE_KEY);
+    const name = getName();
     if (!name) return;
     try {
       await fetch('/api/plus-one/remove', {
@@ -1150,7 +1151,7 @@ MAIN_HTML = r"""<!DOCTYPE html>
     if (e.key === 'Enter') { e.preventDefault(); addPlusOne(); }
   });
 
-  const savedName = localStorage.getItem(STORAGE_KEY);
+  const savedName = getName();
   if (savedName) {
     document.getElementById('name-input').value = savedName;
     refreshMyStatus();
