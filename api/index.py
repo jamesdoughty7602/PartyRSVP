@@ -299,6 +299,8 @@ def api_admin_guest_list():
             return jsonify({"error": "Name already on list"}), 409
     elif action == "remove":
         cur.execute("DELETE FROM guest_list WHERE LOWER(name) = LOWER(%s)", (name,))
+        cur.execute("DELETE FROM rsvps WHERE LOWER(name) = LOWER(%s)", (name,))
+        cur.execute("DELETE FROM plus_ones WHERE LOWER(added_by) = LOWER(%s)", (name,))
         conn.commit()
         conn.close()
         return jsonify({"ok": True})
