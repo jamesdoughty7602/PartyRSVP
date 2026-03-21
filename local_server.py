@@ -419,6 +419,7 @@ class Handler(BaseHTTPRequestHandler):
             guest_id = body.get("id")
             instagram = body.get("instagram", "").strip()
             facebook = body.get("facebook", "").strip()
+            phone = body.get("phone", "").strip()
             if not guest_id:
                 json_response(self, 400, {"error": "Guest ID is required"})
                 return
@@ -426,9 +427,19 @@ class Handler(BaseHTTPRequestHandler):
             conn.execute("UPDATE guest_list SET instagram = ?, facebook = ? WHERE id = ?", (instagram, facebook, guest_id))
             guest = conn.execute("SELECT name FROM guest_list WHERE id = ?", (guest_id,)).fetchone()
             if guest:
-                rsvp = conn.execute("SELECT id, instagram, facebook FROM rsvps WHERE name = ? COLLATE NOCASE", (guest["name"],)).fetchone()
-                if rsvp and not rsvp["instagram"] and not rsvp["facebook"]:
-                    conn.execute("UPDATE rsvps SET instagram = ?, facebook = ? WHERE id = ?", (instagram, facebook, rsvp["id"]))
+                rsvp = conn.execute("SELECT id, instagram, facebook, phone FROM rsvps WHERE name = ? COLLATE NOCASE", (guest["name"],)).fetchone()
+                if rsvp:
+                    updates = []
+                    params = []
+                    if not rsvp["instagram"] and instagram:
+                        updates.append("instagram = ?"); params.append(instagram)
+                    if not rsvp["facebook"] and facebook:
+                        updates.append("facebook = ?"); params.append(facebook)
+                    if phone:
+                        updates.append("phone = ?"); params.append(phone)
+                    if updates:
+                        params.append(rsvp["id"])
+                        conn.execute("UPDATE rsvps SET " + ", ".join(updates) + " WHERE id = ?", params)
             conn.commit()
             conn.close()
             json_response(self, 200, {"ok": True})
@@ -1715,15 +1726,15 @@ ADMIN_HTML = r"""<!DOCTYPE html>
       const btnId = 'copy-' + g.id;
       const tokenTail = g.invite_token ? g.invite_token.slice(-6) : '';
       const mainRow = '<tr><td><strong>' + esc(g.name) + '</strong></td><td>' + statusHtml + '</td><td><div style="display:flex;align-items:center;gap:8px"><button class="copy-btn" id="' + btnId + '" onclick="copyLink(\'' + esc(inviteUrl).replace(/'/g, "\\'") + '\',\'' + btnId + '\')" title="' + esc(inviteUrl) + '">Copy Link</button><span style="font-size:10px;color:#bbb;font-family:monospace">...' + esc(tokenTail) + '</span></div></td></tr>';
-      const socialsRow = '<tr><td colspan="3" style="padding:4px 12px 8px"><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><span style="font-size:11px;color:#999;font-weight:600">PRE-FILL SOCIALS:</span><input type="text" id="guest-ig-' + g.id + '" value="' + esc(g.instagram || '').replace(/"/g, '&quot;') + '" placeholder="Instagram URL" style="padding:4px 8px;font-size:12px;border:1px solid #e8e6e3;border-radius:6px;flex:1;min-width:100px"><input type="text" id="guest-fb-' + g.id + '" value="' + esc(g.facebook || '').replace(/"/g, '&quot;') + '" placeholder="Facebook URL" style="padding:4px 8px;font-size:12px;border:1px solid #e8e6e3;border-radius:6px;flex:1;min-width:100px"><button class="action-btn approve-btn" style="font-size:11px;padding:4px 10px" onclick="saveGuestSocials(' + g.id + ')">Save</button></div></td></tr>';
+      const guestPhone = rsvp ? (rsvp.phone || '') : '';
       const hasIg = rsvp && rsvp.instagram;
       const hasFb = rsvp && rsvp.facebook;
       const hasPhone = rsvp && rsvp.phone;
-      const igStatus = hasIg ? '<span style="color:#1a7a42">&#10003; IG</span>' : '<span style="color:#ccc">&#10007; IG</span>';
-      const fbStatus = hasFb ? '<span style="color:#1a7a42">&#10003; FB</span>' : '<span style="color:#ccc">&#10007; FB</span>';
-      const phoneStatus = hasPhone ? '<span style="color:#1a7a42">&#10003; Phone</span>' : '<span style="color:#ccc">&#10007; Phone</span>';
-      const infoRow = '<tr><td colspan="3" style="padding:2px 12px 14px;border-bottom:2px solid #eee"><div style="display:flex;gap:12px;font-size:11px;font-weight:600">' + igStatus + fbStatus + phoneStatus + '</div></td></tr>';
-      return mainRow + socialsRow + infoRow;
+      const igTick = hasIg ? '<span style="color:#1a7a42;font-size:11px">&#10003;</span> ' : '<span style="color:#ccc;font-size:11px">&#10007;</span> ';
+      const fbTick = hasFb ? '<span style="color:#1a7a42;font-size:11px">&#10003;</span> ' : '<span style="color:#ccc;font-size:11px">&#10007;</span> ';
+      const phoneTick = hasPhone ? '<span style="color:#1a7a42;font-size:11px">&#10003;</span> ' : '<span style="color:#ccc;font-size:11px">&#10007;</span> ';
+      const detailsRow = '<tr><td colspan="3" style="padding:4px 12px 14px;border-bottom:2px solid #eee"><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px"><span style="font-size:11px;color:#999;font-weight:600">SOCIALS & PHONE:</span></div><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px">' + igTick + '<input type="text" id="guest-ig-' + g.id + '" value="' + esc(g.instagram || '').replace(/"/g, '&quot;') + '" placeholder="Instagram URL" style="padding:4px 8px;font-size:12px;border:1px solid #e8e6e3;border-radius:6px;flex:1;min-width:100px">' + fbTick + '<input type="text" id="guest-fb-' + g.id + '" value="' + esc(g.facebook || '').replace(/"/g, '&quot;') + '" placeholder="Facebook URL" style="padding:4px 8px;font-size:12px;border:1px solid #e8e6e3;border-radius:6px;flex:1;min-width:100px"></div><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">' + phoneTick + '<input type="text" id="guest-phone-' + g.id + '" value="' + esc(guestPhone).replace(/"/g, '&quot;') + '" placeholder="Phone number" style="padding:4px 8px;font-size:12px;border:1px solid #e8e6e3;border-radius:6px;flex:1;min-width:100px"><button class="action-btn approve-btn" style="font-size:11px;padding:4px 10px" onclick="saveGuestDetails(' + g.id + ')">Save</button></div></td></tr>';
+      return mainRow + detailsRow;
     }).join('');
   }
 
@@ -1854,19 +1865,21 @@ ADMIN_HTML = r"""<!DOCTYPE html>
     } catch (e) { showToast('Failed to send alert'); }
   }
 
-  async function saveGuestSocials(guestId) {
+  async function saveGuestDetails(guestId) {
     const igInput = document.getElementById('guest-ig-' + guestId);
     const fbInput = document.getElementById('guest-fb-' + guestId);
+    const phoneInput = document.getElementById('guest-phone-' + guestId);
     const instagram = igInput ? igInput.value.trim() : '';
     const facebook = fbInput ? fbInput.value.trim() : '';
+    const phone = phoneInput ? phoneInput.value.trim() : '';
     try {
       const res = await fetch('/api/admin/update-guest-socials', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: guestId, instagram, facebook })
+        body: JSON.stringify({ id: guestId, instagram, facebook, phone })
       });
       if (res.ok) {
-        showToast('Socials saved!');
+        showToast('Details saved!');
         loadData();
       }
     } catch (e) { showToast('Failed to save'); }
