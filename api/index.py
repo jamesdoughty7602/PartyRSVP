@@ -103,8 +103,8 @@ def check_admin():
 # ─── Routes ──────────────────────────────────────────────────────────────────
 
 
-@app.route("/")
-def index():
+@app.route("/rsvp")
+def rsvp_page():
     invite_token = request.args.get("invite", "").strip()
     if invite_token:
         conn = get_db()
@@ -113,7 +113,7 @@ def index():
         guest = cur.fetchone()
         conn.close()
         if guest:
-            prefill_script = f'<script>if(!localStorage.getItem(STORAGE_KEY)){{localStorage.setItem(STORAGE_KEY,{json.dumps(guest["name"])});location.href="/";}}</script>'
+            prefill_script = f'<script>if(!localStorage.getItem(STORAGE_KEY)){{localStorage.setItem(STORAGE_KEY,{json.dumps(guest["name"])});location.href="/rsvp";}}</script>'
             html = MAIN_HTML.replace('</body>', prefill_script + '</body>')
             return make_response(html, 200, {"Content-Type": "text/html; charset=utf-8"})
     return make_response(MAIN_HTML, 200, {"Content-Type": "text/html; charset=utf-8"})
@@ -173,7 +173,7 @@ def api_plus_ones():
     return jsonify({"plus_ones": [{"id": r["id"], "name": r["name"], "approved": r["approved"] == 1, "denied": r["approved"] == -1} for r in rows]})
 
 
-@app.route("/admin")
+@app.route("/")
 def admin():
     if check_admin():
         return make_response(ADMIN_HTML, 200, {"Content-Type": "text/html; charset=utf-8"})
@@ -1544,7 +1544,7 @@ ADMIN_HTML = r"""<!DOCTYPE html>
       const statusHtml = rsvp
         ? '<span class="status-badge status-' + rsvp.status + '">' + statusLabel(rsvp.status) + '</span>'
         : '<span class="no-rsvp">Not yet</span>';
-      const inviteUrl = baseUrl + '/?invite=' + g.invite_token;
+      const inviteUrl = baseUrl + '/rsvp?invite=' + g.invite_token;
       const btnId = 'copy-' + g.id;
       return '<tr><td><strong>' + esc(g.name) + '</strong></td><td>' + statusHtml + '</td><td><span class="invite-url" title="' + esc(inviteUrl) + '">' + esc(inviteUrl) + '</span></td><td><button class="copy-btn" id="' + btnId + '" onclick="copyLink(\'' + esc(inviteUrl).replace(/'/g, "\\'") + '\',\'' + btnId + '\')">Copy</button></td></tr>';
     }).join('');
