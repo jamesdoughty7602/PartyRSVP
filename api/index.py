@@ -1710,7 +1710,8 @@ ADMIN_HTML = r"""<!DOCTYPE html>
         : '<span class="no-rsvp">Not yet</span>';
       const inviteUrl = baseUrl + '/rsvp?invite=' + g.invite_token;
       const btnId = 'copy-' + g.id;
-      const mainRow = '<tr><td><strong>' + esc(g.name) + '</strong></td><td>' + statusHtml + '</td><td><button class="copy-btn" id="' + btnId + '" onclick="copyLink(\'' + esc(inviteUrl).replace(/'/g, "\\'") + '\',\'' + btnId + '\')" title="' + esc(inviteUrl) + '">Copy Link</button></td></tr>';
+      const tokenTail = g.invite_token ? g.invite_token.slice(-6) : '';
+      const mainRow = '<tr><td><strong>' + esc(g.name) + '</strong></td><td>' + statusHtml + '</td><td><div style="display:flex;align-items:center;gap:8px"><button class="copy-btn" id="' + btnId + '" onclick="copyLink(\'' + esc(inviteUrl).replace(/'/g, "\\'") + '\',\'' + btnId + '\')" title="' + esc(inviteUrl) + '">Copy Link</button><span style="font-size:10px;color:#bbb;font-family:monospace">...' + esc(tokenTail) + '</span></div></td></tr>';
       const socialsRow = '<tr><td colspan="3" style="padding:4px 12px 16px;border-bottom:2px solid #eee"><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><span style="font-size:11px;color:#999;font-weight:600">PRE-FILL SOCIALS:</span><input type="text" id="guest-ig-' + g.id + '" value="' + esc(g.instagram || '').replace(/"/g, '&quot;') + '" placeholder="Instagram URL" style="padding:4px 8px;font-size:12px;border:1px solid #e8e6e3;border-radius:6px;flex:1;min-width:100px"><input type="text" id="guest-fb-' + g.id + '" value="' + esc(g.facebook || '').replace(/"/g, '&quot;') + '" placeholder="Facebook URL" style="padding:4px 8px;font-size:12px;border:1px solid #e8e6e3;border-radius:6px;flex:1;min-width:100px"><button class="action-btn approve-btn" style="font-size:11px;padding:4px 10px" onclick="saveGuestSocials(' + g.id + ')">Save</button></div></td></tr>';
       return mainRow + socialsRow;
     }).join('');
