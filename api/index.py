@@ -45,9 +45,27 @@ def init_db():
         approved INTEGER NOT NULL DEFAULT 0,
         instagram TEXT DEFAULT '',
         facebook TEXT DEFAULT '',
+        phone TEXT DEFAULT '',
         created_at TIMESTAMP DEFAULT NOW(),
         updated_at TIMESTAMP DEFAULT NOW()
     )""")
+    # Migrate: add phone column if missing
+    try:
+        cur.execute("ALTER TABLE rsvps ADD COLUMN phone TEXT DEFAULT ''")
+        conn.commit()
+    except Exception:
+        conn.rollback()
+    # Migrate: add instagram/facebook columns to guest_list for host pre-fill
+    try:
+        cur.execute("ALTER TABLE guest_list ADD COLUMN instagram TEXT DEFAULT ''")
+        conn.commit()
+    except Exception:
+        conn.rollback()
+    try:
+        cur.execute("ALTER TABLE guest_list ADD COLUMN facebook TEXT DEFAULT ''")
+        conn.commit()
+    except Exception:
+        conn.rollback()
     cur.execute("""CREATE TABLE IF NOT EXISTS plus_ones (
         id SERIAL PRIMARY KEY,
         added_by TEXT NOT NULL,
@@ -152,11 +170,11 @@ def api_my_status():
         return jsonify({"found": False})
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("SELECT status, approved, instagram, facebook FROM rsvps WHERE LOWER(name) = LOWER(%s)", (name,))
+    cur.execute("SELECT status, approved, instagram, facebook, phone FROM rsvps WHERE LOWER(name) = LOWER(%s)", (name,))
     row = cur.fetchone()
     conn.close()
     if row:
-        return jsonify({"found": True, "status": row["status"], "approved": row["approved"], "instagram": row["instagram"] or "", "facebook": row["facebook"] or ""})
+        return jsonify({"found": True, "status": row["status"], "approved": row["approved"], "instagram": row["instagram"] or "", "facebook": row["facebook"] or "", "phone": row["phone"] or ""})
     return jsonify({"found": False})
 
 
@@ -186,9 +204,9 @@ def api_admin_data():
         return jsonify({"error": "Unauthorized"}), 401
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("SELECT id, name, invite_token FROM guest_list ORDER BY LOWER(name)")
+    cur.execute("SELECT id, name, invite_token, instagram, facebook FROM guest_list ORDER BY LOWER(name)")
     guest_list = cur.fetchall()
-    cur.execute("SELECT id, name, status, approved, instagram, facebook, created_at, updated_at FROM rsvps ORDER BY created_at DESC")
+    cur.execute("SELECT id, name, status, approved, instagram, facebook, phone, created_at, updated_at FROM rsvps ORDER BY created_at DESC")
     rsvps = cur.fetchall()
     cur.execute("SELECT id, added_by, name, approved, created_at FROM plus_ones ORDER BY LOWER(added_by), created_at DESC")
     plus_ones = cur.fetchall()
@@ -257,6 +275,72 @@ def api_update_socials():
     conn.commit()
     conn.close()
     return jsonify({"ok": True})
+
+
+@app.route("/api/update-phone", methods=["POST"])
+def api_update_phone():
+    body = request.get_json(force=True)
+    name = body.get("name", "").strip()
+    phone = body.get("phone", "").strip()
+    if not name:
+        return jsonify({"error": "Name is required"}), 400
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT id FROM rsvps WHERE LOWER(name) = LOWER(%s)", (name,))
+    existing = cur.fetchone()
+    if not existing:
+        conn.close()
+        return jsonify({"error": "RSVP not found"}), 404
+    cur.execute("UPDATE rsvps SET phone = %s, updated_at = NOW() WHERE id = %s", (phone, existing["id"]))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/admin/update-guest-socials", methods=["POST"])
+def api_admin_update_guest_socials():
+    if not check_admin():
+        return jsonify({"error": "Unauthorized"}), 401
+    body = request.get_json(force=True)
+    guest_id = body.get("id")
+    instagram = body.get("instagram", "").strip()
+    facebook = body.get("facebook", "").strip()
+    if not guest_id:
+        return jsonify({"error": "Guest ID is required"}), 400
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("UPDATE guest_list SET instagram = %s, facebook = %s WHERE id = %s", (instagram, facebook, guest_id))
+    # Also update the rsvps table if the guest has RSVP'd and their socials are empty
+    cur.execute("SELECT name FROM guest_list WHERE id = %s", (guest_id,))
+    guest = cur.fetchone()
+    if guest:
+        cur.execute("SELECT id, instagram, facebook FROM rsvps WHERE LOWER(name) = LOWER(%s)", (guest["name"],))
+        rsvp = cur.fetchone()
+        if rsvp and not rsvp["instagram"] and not rsvp["facebook"]:
+            cur.execute("UPDATE rsvps SET instagram = %s, facebook = %s WHERE id = %s", (instagram, facebook, rsvp["id"]))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/admin/send-alert", methods=["POST"])
+def api_admin_send_alert():
+    if not check_admin():
+        return jsonify({"error": "Unauthorized"}), 401
+    body = request.get_json(force=True)
+    message = body.get("message", "").strip()
+    if not message:
+        return jsonify({"error": "Message is required"}), 400
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT name, phone FROM rsvps WHERE phone IS NOT NULL AND phone != '' AND approved = 1")
+    recipients = cur.fetchall()
+    conn.close()
+    # Log the alert (in a real app, this would send SMS)
+    print(f"[ALERT] Message: {message}")
+    for r in recipients:
+        print(f"  -> {r['name']}: {r['phone']}")
+    return jsonify({"ok": True, "sent_to": len(recipients), "recipients": [{"name": r["name"], "phone": r["phone"]} for r in recipients]})
 
 
 @app.route("/api/admin/login", methods=["POST"])
@@ -499,6 +583,8 @@ MAIN_HTML = r"""<!DOCTYPE html>
   .detail-label { font-size: 12px; font-weight: 600; color: #999; text-transform: uppercase; letter-spacing: 0.06em; }
   .detail-value { font-size: 15px; font-weight: 500; color: #1a1a1a; margin-top: 1px; }
 
+  .byob-msg { font-size: 14px; color: #777; text-align: center; padding: 10px 0 2px; font-weight: 500; letter-spacing: 0.01em; }
+
   .tabs { display: flex; border-bottom: 1px solid #eee; position: sticky; top: 0; background: #fff; z-index: 10; }
   .tab-btn { flex: 1; padding: 16px; border: none; background: transparent; font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 600; color: #999; cursor: pointer; position: relative; transition: color 0.2s; }
   .tab-btn.active { color: #1a1a1a; }
@@ -571,7 +657,9 @@ MAIN_HTML = r"""<!DOCTYPE html>
   .socials-section { margin-top: 24px; padding-top: 20px; border-top: 1px solid #eee; }
   .socials-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
   .socials-header h3 { font-size: 15px; font-weight: 700; color: #1a1a1a; }
-  .socials-prompt { font-size: 13px; color: #999; margin-bottom: 16px; }
+  .socials-prompt { font-size: 13px; color: #999; margin-bottom: 6px; }
+  .socials-subtitle { font-size: 12px; color: #bbb; margin-bottom: 14px; font-style: italic; }
+  .phone-section { margin-top: 24px; padding-top: 20px; border-top: 1px solid #eee; }
   .social-input-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
   .social-icon-label { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .social-icon-label.ig { background: linear-gradient(135deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888); }
@@ -692,6 +780,7 @@ MAIN_HTML = r"""<!DOCTYPE html>
       <div class="detail-icon">&#128205;</div>
       <div class="detail-text"><span class="detail-label">Location</span><span class="detail-value">TBD - Check back soon!</span></div>
     </div>
+    <div class="byob-msg">&#127865; Feel free to bring your own drinks — the more the merrier!</div>
   </div>
 
   <div class="tabs">
@@ -710,9 +799,19 @@ MAIN_HTML = r"""<!DOCTYPE html>
         <label for="name-input">Your Name</label>
         <input type="text" id="name-input" placeholder="Enter your name" autocomplete="off" required>
       </div>
+      <div class="phone-section" id="phone-section">
+      <div class="socials-header"><h3>Get party alerts &#128242;</h3></div>
+      <p class="socials-prompt">Drop your number to stay in the loop on any updates! (optional)</p>
+      <div class="social-input-row">
+        <div class="social-icon-label" style="background:#1a1a1a"><svg viewBox="0 0 24 24" style="width:20px;height:20px;fill:#fff"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg></div>
+        <input type="tel" class="social-input" id="phone-input" placeholder="Your phone number" autocomplete="off">
+      </div>
+      <button class="save-socials-btn" onclick="savePhone()">Save Number</button>
+      </div>
       <div class="socials-section" id="socials-section">
       <div class="socials-header"><h3>Link your socials</h3></div>
       <p class="socials-prompt">Copy &amp; paste your profile links so other guests can find you! (optional)</p>
+      <p class="socials-subtitle">The host may have already filled this in for you &#128064;</p>
       <div class="social-input-row">
         <div class="social-icon-label ig"><svg viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg></div>
         <input type="url" class="social-input" id="ig-input" placeholder="https://instagram.com/yourprofile" autocomplete="off">
@@ -721,6 +820,7 @@ MAIN_HTML = r"""<!DOCTYPE html>
         <div class="social-icon-label fb"><svg viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385h-3.047v-3.47h3.047v-2.642c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953h-1.514c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385c5.737-.9 10.125-5.864 10.125-11.854z"/></svg></div>
         <input type="url" class="social-input" id="fb-input" placeholder="https://facebook.com/yourprofile" autocomplete="off">
       </div>
+      <button class="save-socials-btn" onclick="saveSocials()">Save Socials</button>
       </div>
       <div class="rsvp-buttons">
         <button type="button" class="rsvp-btn going" onclick="submitRsvp('going')">Going &#127881;</button>
@@ -848,8 +948,10 @@ MAIN_HTML = r"""<!DOCTYPE html>
         document.getElementById('rsvp-intro').querySelector('h2').innerHTML = 'Welcome back, <span class="gradient-name">' + escapeHtml(firstName) + '</span>!';
         document.getElementById('rsvp-intro').querySelector('p').textContent = 'Update your status or add your social links below.';
         document.getElementById('socials-section').style.display = '';
+        document.getElementById('phone-section').style.display = '';
         document.getElementById('ig-input').value = data.instagram || '';
         document.getElementById('fb-input').value = data.facebook || '';
+        document.getElementById('phone-input').value = data.phone || '';
       }
       const poRes = await fetch('/api/plus-ones?name=' + encodeURIComponent(name));
       const poData = await poRes.json();
@@ -926,6 +1028,37 @@ MAIN_HTML = r"""<!DOCTYPE html>
     }).join('') + '</ul>';
   }
 
+  async function saveSocials() {
+    const name = getName();
+    if (!name) return;
+    const instagram = document.getElementById('ig-input').value.trim();
+    const facebook = document.getElementById('fb-input').value.trim();
+    try {
+      const res = await fetch('/api/update-socials', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, instagram, facebook })
+      });
+      if (res.ok) showToast('&#10003; Socials saved!');
+      else showToast('Could not save — RSVP first');
+    } catch (e) { showToast('Something went wrong'); }
+  }
+
+  async function savePhone() {
+    const name = getName();
+    if (!name) return;
+    const phone = document.getElementById('phone-input').value.trim();
+    try {
+      const res = await fetch('/api/update-phone', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, phone })
+      });
+      if (res.ok) showToast('&#10003; Phone number saved!');
+      else showToast('Could not save — RSVP first');
+    } catch (e) { showToast('Something went wrong'); }
+  }
+
   async function submitRsvp(status) {
     const input = document.getElementById('name-input');
     const errEl = document.getElementById('error-msg');
@@ -937,14 +1070,11 @@ MAIN_HTML = r"""<!DOCTYPE html>
     const buttons = document.querySelectorAll('.rsvp-btn');
     buttons.forEach(b => b.disabled = true);
 
-    const instagram = document.getElementById('ig-input').value.trim();
-    const facebook = document.getElementById('fb-input').value.trim();
-
     try {
       const res = await fetch('/api/rsvp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, status, instagram, facebook })
+        body: JSON.stringify({ name, status })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Something went wrong');
@@ -968,6 +1098,7 @@ MAIN_HTML = r"""<!DOCTYPE html>
       }
       refreshMyStatus();
       document.getElementById('socials-section').style.display = '';
+      document.getElementById('phone-section').style.display = '';
     } catch (err) {
       errEl.textContent = err.message;
     } finally {
@@ -1279,6 +1410,7 @@ ADMIN_HTML = r"""<!DOCTYPE html>
   .copy-btn:hover { border-color: #c44dff; color: #c44dff; }
   .copy-btn.copied { border-color: #27ae60; color: #27ae60; background: #e8f8ef; }
   .no-rsvp { color: #bbb; font-style: italic; }
+  .count-pills { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
 
   .plusone-group { margin-bottom: 20px; padding: 16px; background: #faf9f7; border-radius: 12px; }
   .plusone-group-header { font-size: 15px; font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
@@ -1309,6 +1441,7 @@ ADMIN_HTML = r"""<!DOCTYPE html>
 
   <div class="admin-tabs">
     <button class="admin-tab active" onclick="showAdminTab('manage')">Manage</button>
+    <button class="admin-tab" onclick="showAdminTab('invitelinks')">Guest Invite Links</button>
     <button class="admin-tab" onclick="showAdminTab('guestlist')">Guest List</button>
   </div>
 
@@ -1344,16 +1477,39 @@ ADMIN_HTML = r"""<!DOCTYPE html>
     </div>
   </div>
 
-  <!-- GUEST LIST TAB -->
-  <div class="admin-panel" id="panel-guestlist">
+  <!-- GUEST INVITE LINKS TAB -->
+  <div class="admin-panel" id="panel-invitelinks">
     <div class="card">
       <h2>&#128279; Guest Invite Links</h2>
       <p style="color:#777;font-size:14px;margin-bottom:16px;">Share unique invite links with each guest. Their name will be pre-filled when they open the link.</p>
       <div style="overflow-x:auto">
         <table>
-          <thead><tr><th>Guest Name</th><th>RSVP Status</th><th>Invite Link</th><th></th></tr></thead>
+          <thead><tr><th>Guest Name</th><th>RSVP Status</th><th>Socials Pre-fill</th><th>Invite Link</th><th></th></tr></thead>
           <tbody id="invite-table"></tbody>
         </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- GUEST LIST TAB (read-only public view) -->
+  <div class="admin-panel" id="panel-guestlist">
+    <div class="card">
+      <h2>&#127881; Guest List</h2>
+      <p style="color:#777;font-size:14px;margin-bottom:16px;">This is exactly what guests see on the public site.</p>
+      <div class="count-pills" id="admin-count-pills"></div>
+      <div id="admin-guest-list-container"></div>
+    </div>
+
+    <div class="card">
+      <h2>&#128242; Phone Numbers &amp; Alerts</h2>
+      <div id="phone-list-area"></div>
+      <div style="margin-top:16px;border-top:1px solid #eee;padding-top:16px;">
+        <p style="color:#777;font-size:14px;margin-bottom:10px;">Send a note to all guests who provided a phone number:</p>
+        <div class="add-form">
+          <input type="text" id="alert-message" placeholder="Type your alert message...">
+          <button onclick="sendAlert()">Send Alert</button>
+        </div>
+        <div id="alert-result" style="margin-top:10px;"></div>
       </div>
     </div>
   </div>
@@ -1524,11 +1680,13 @@ ADMIN_HTML = r"""<!DOCTYPE html>
 
   function showAdminTab(tab) {
     document.querySelectorAll('.admin-tab').forEach((t, i) => {
-      t.classList.toggle('active', (tab === 'manage' && i === 0) || (tab === 'guestlist' && i === 1));
+      t.classList.toggle('active', (tab === 'manage' && i === 0) || (tab === 'invitelinks' && i === 1) || (tab === 'guestlist' && i === 2));
     });
     document.getElementById('panel-manage').classList.toggle('active', tab === 'manage');
+    document.getElementById('panel-invitelinks').classList.toggle('active', tab === 'invitelinks');
     document.getElementById('panel-guestlist').classList.toggle('active', tab === 'guestlist');
-    if (tab === 'guestlist') renderInviteTable();
+    if (tab === 'invitelinks') renderInviteTable();
+    if (tab === 'guestlist') { renderAdminGuestList(); renderPhoneList(); }
   }
 
   let _adminData = null;
@@ -1552,7 +1710,8 @@ ADMIN_HTML = r"""<!DOCTYPE html>
         : '<span class="no-rsvp">Not yet</span>';
       const inviteUrl = baseUrl + '/rsvp?invite=' + g.invite_token;
       const btnId = 'copy-' + g.id;
-      return '<tr><td><strong>' + esc(g.name) + '</strong></td><td>' + statusHtml + '</td><td><span class="invite-url" title="' + esc(inviteUrl) + '">' + esc(inviteUrl) + '</span></td><td><button class="copy-btn" id="' + btnId + '" onclick="copyLink(\'' + esc(inviteUrl).replace(/'/g, "\\'") + '\',\'' + btnId + '\')">Copy</button></td></tr>';
+      const socialsHtml = '<div style="display:flex;flex-direction:column;gap:4px"><input type="text" id="guest-ig-' + g.id + '" value="' + esc(g.instagram || '').replace(/"/g, '&quot;') + '" placeholder="Instagram" style="padding:4px 8px;font-size:12px;border:1px solid #e8e6e3;border-radius:6px;width:130px"><input type="text" id="guest-fb-' + g.id + '" value="' + esc(g.facebook || '').replace(/"/g, '&quot;') + '" placeholder="Facebook" style="padding:4px 8px;font-size:12px;border:1px solid #e8e6e3;border-radius:6px;width:130px"><button class="action-btn approve-btn" style="font-size:11px;padding:4px 8px" onclick="saveGuestSocials(' + g.id + ')">Save</button></div>';
+      return '<tr><td><strong>' + esc(g.name) + '</strong></td><td>' + statusHtml + '</td><td>' + socialsHtml + '</td><td><span class="invite-url" title="' + esc(inviteUrl) + '">' + esc(inviteUrl) + '</span></td><td><button class="copy-btn" id="' + btnId + '" onclick="copyLink(\'' + esc(inviteUrl).replace(/'/g, "\\'") + '\',\'' + btnId + '\')">Copy</button></td></tr>';
     }).join('');
   }
 
@@ -1572,6 +1731,132 @@ ADMIN_HTML = r"""<!DOCTYPE html>
       btn.classList.add('copied');
       setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
     });
+  }
+
+  const AVATAR_COLORS = ['#ff6b9d','#c44dff','#6e8efb','#4dc9f6','#f39c12','#e74c3c','#27ae60','#8e44ad','#2980b9','#d35400','#16a085','#e84393','#6c5ce7','#00b894','#fdcb6e'];
+  function getAvatarColor(name) {
+    let h = 0;
+    for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
+    return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
+  }
+  const IG_SVG = '<svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:#fff"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>';
+  const FB_SVG = '<svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:#fff"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385h-3.047v-3.47h3.047v-2.642c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953h-1.514c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385c5.737-.9 10.125-5.864 10.125-11.854z"/></svg>';
+
+  async function renderAdminGuestList() {
+    try {
+      const res = await fetch('/api/rsvps');
+      const data = await res.json();
+      const pills = document.getElementById('admin-count-pills');
+      const container = document.getElementById('admin-guest-list-container');
+
+      pills.innerHTML = '';
+      if (data.going_count > 0) pills.innerHTML += '<span style="font-size:12px;font-weight:700;padding:5px 12px;border-radius:100px;background:#e8f8ef;color:#1a7a42">' + data.going_count + ' going</span> ';
+      if (data.maybe_count > 0) pills.innerHTML += '<span style="font-size:12px;font-weight:700;padding:5px 12px;border-radius:100px;background:#fff8e6;color:#9a7b20">' + data.maybe_count + ' maybe</span> ';
+      if (data.cant_go_count > 0) pills.innerHTML += '<span style="font-size:12px;font-weight:700;padding:5px 12px;border-radius:100px;background:#fde8e8;color:#c0392b">' + data.cant_go_count + " can't go</span> ";
+
+      if (data.guests.length === 0) {
+        container.innerHTML = '<p class="empty-text">No RSVPs yet.</p>';
+        return;
+      }
+
+      const going = data.guests.filter(g => g.status === 'going');
+      const maybe = data.guests.filter(g => g.status === 'maybe');
+      const cant = data.guests.filter(g => g.status === 'cant_go');
+
+      function renderGroup(guests) {
+        return guests.map(g => {
+          const color = getAvatarColor(g.name);
+          let socials = '';
+          if (g.instagram || g.facebook) {
+            socials = '<span style="display:flex;gap:6px;align-items:center">';
+            if (g.instagram) {
+              const igUrl = g.instagram.startsWith('http') ? g.instagram : 'https://instagram.com/' + g.instagram;
+              socials += '<a href="' + esc(igUrl) + '" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888);text-decoration:none" title="Instagram">' + IG_SVG + '</a>';
+            }
+            if (g.facebook) {
+              const fbUrl = g.facebook.startsWith('http') ? g.facebook : 'https://facebook.com/' + g.facebook;
+              socials += '<a href="' + esc(fbUrl) + '" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:8px;background:#1877f2;text-decoration:none" title="Facebook">' + FB_SVG + '</a>';
+            }
+            socials += '</span>';
+          }
+          return '<div style="display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid #f0eee9"><span style="width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;color:#fff;flex-shrink:0;background:' + color + '">' + esc(g.name.charAt(0).toUpperCase()) + '</span><span style="flex:1;font-size:15px;font-weight:500">' + esc(g.name) + '</span>' + socials + '</div>';
+        }).join('');
+      }
+
+      let html = '';
+      if (going.length > 0) {
+        html += '<div style="font-size:12px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:0.06em;margin-top:20px;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid #f0eee9">Going &#127881;</div>';
+        html += renderGroup(going);
+      }
+      if (maybe.length > 0) {
+        html += '<div style="font-size:12px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:0.06em;margin-top:20px;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid #f0eee9">Maybe &#129300;</div>';
+        html += renderGroup(maybe);
+      }
+      if (cant.length > 0) {
+        html += '<div style="font-size:12px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:0.06em;margin-top:20px;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid #f0eee9">Can\'t Go</div>';
+        html += renderGroup(cant);
+      }
+      container.innerHTML = html;
+    } catch (e) { console.error('Failed to load guest list', e); }
+  }
+
+  function renderPhoneList() {
+    if (!_adminData) return;
+    const area = document.getElementById('phone-list-area');
+    const rsvps = _adminData.rsvps.filter(r => r.approved === 1);
+    if (rsvps.length === 0) {
+      area.innerHTML = '<p class="empty-text">No approved RSVPs yet</p>';
+      return;
+    }
+    let html = '<table><thead><tr><th>Name</th><th>Phone</th><th>Status</th></tr></thead><tbody>';
+    rsvps.forEach(r => {
+      const phone = r.phone ? esc(r.phone) : '<span style="color:#bbb;font-style:italic">Not provided</span>';
+      html += '<tr><td><strong>' + esc(r.name) + '</strong></td><td>' + phone + '</td><td><span class="status-badge status-' + r.status + '">' + statusLabel(r.status) + '</span></td></tr>';
+    });
+    html += '</tbody></table>';
+    area.innerHTML = html;
+  }
+
+  async function sendAlert() {
+    const input = document.getElementById('alert-message');
+    const message = input.value.trim();
+    if (!message) return;
+    try {
+      const res = await fetch('/api/admin/send-alert', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        input.value = '';
+        const resultArea = document.getElementById('alert-result');
+        if (data.sent_to > 0) {
+          resultArea.innerHTML = '<div style="padding:12px;background:#e8f8ef;border-radius:10px;font-size:14px;color:#1a7a42">&#10003; Alert logged for ' + data.sent_to + ' guest(s): ' + data.recipients.map(r => esc(r.name)).join(', ') + '</div>';
+        } else {
+          resultArea.innerHTML = '<div style="padding:12px;background:#fff8e6;border-radius:10px;font-size:14px;color:#9a7b20">No guests have provided phone numbers yet.</div>';
+        }
+        showToast('Alert sent!');
+      }
+    } catch (e) { showToast('Failed to send alert'); }
+  }
+
+  async function saveGuestSocials(guestId) {
+    const igInput = document.getElementById('guest-ig-' + guestId);
+    const fbInput = document.getElementById('guest-fb-' + guestId);
+    const instagram = igInput ? igInput.value.trim() : '';
+    const facebook = fbInput ? fbInput.value.trim() : '';
+    try {
+      const res = await fetch('/api/admin/update-guest-socials', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: guestId, instagram, facebook })
+      });
+      if (res.ok) {
+        showToast('Socials saved!');
+        loadData();
+      }
+    } catch (e) { showToast('Failed to save'); }
   }
 
   document.getElementById('add-name').addEventListener('keydown', e => {
