@@ -422,6 +422,22 @@ class Handler(BaseHTTPRequestHandler):
             conn.close()
             json_response(self, 200, {"ok": True})
 
+        elif self.path == "/api/admin/delete-plus-one":
+            if not check_admin_session(self.headers.get("Cookie")):
+                json_response(self, 401, {"error": "Unauthorized"})
+                return
+            body = read_body(self)
+            name = body.get("name", "").strip()
+            if not name:
+                json_response(self, 400, {"error": "Name is required"})
+                return
+            conn = get_db()
+            conn.execute("DELETE FROM plus_ones WHERE name = ? COLLATE NOCASE", (name,))
+            conn.execute("DELETE FROM rsvps WHERE name = ? COLLATE NOCASE", (name,))
+            conn.commit()
+            conn.close()
+            json_response(self, 200, {"ok": True})
+
         elif self.path == "/api/update-phone":
             body = read_body(self)
             name = body.get("name", "").strip()
@@ -1644,11 +1660,15 @@ ADMIN_HTML = r"""<!DOCTYPE html>
         '<span class="chip' + (g.type === 'plusone' ? ' chip-plusone' : '') + '">' + esc(g.name) + (g.type === 'plusone' ? ' <span style="font-size:10px;color:#999">+1</span>' : '') + ' <button class="remove" data-name="' + esc(g.name).replace(/"/g, '&quot;') + '" data-type="' + g.type + '">&times;</button></span>'
       ).join('');
       chips.querySelectorAll('.remove[data-name]').forEach(btn => {
-        btn.onclick = () => {
+        btn.onclick = async () => {
+          const gName = btn.getAttribute('data-name');
           if (btn.getAttribute('data-type') === 'plusone') {
-            alert('Plus ones can be removed from the Manage tab under Plus One requests.');
+            if (confirm('Remove "' + gName + '" from the approved list? This will also remove their RSVP.')) {
+              await fetch('/api/admin/delete-plus-one', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ name: gName }) });
+              loadAdminData();
+            }
           } else {
-            removeGuest(btn.getAttribute('data-name'));
+            removeGuest(gName);
           }
         };
       });

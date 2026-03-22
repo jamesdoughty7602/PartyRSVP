@@ -562,6 +562,23 @@ def api_admin_approve_plus_one():
     return jsonify({"ok": True})
 
 
+@app.route("/api/admin/delete-plus-one", methods=["POST"])
+def api_admin_delete_plus_one():
+    if not check_admin():
+        return jsonify({"error": "Unauthorized"}), 401
+    body = request.get_json(force=True)
+    name = body.get("name", "").strip()
+    if not name:
+        return jsonify({"error": "Name is required"}), 400
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM plus_ones WHERE LOWER(name) = LOWER(%s)", (name,))
+    cur.execute("DELETE FROM rsvps WHERE LOWER(name) = LOWER(%s)", (name,))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+
 # ─── HTML Templates ──────────────────────────────────────────────────────────
 
 MAIN_HTML = r"""<!DOCTYPE html>
@@ -1655,14 +1672,15 @@ ADMIN_HTML = r"""<!DOCTYPE html>
         '<span class="chip' + (g.type === 'plusone' ? ' chip-plusone' : '') + '">' + esc(g.name) + (g.type === 'plusone' ? ' <span style="font-size:10px;color:#999">+1</span>' : '') + ' <button class="remove" data-name="' + esc(g.name).replace(/"/g, '&quot;') + '" data-type="' + g.type + '">&times;</button></span>'
       ).join('');
       chips.querySelectorAll('.remove[data-name]').forEach(btn => {
-        btn.onclick = () => {
+        btn.onclick = async () => {
+          const gName = btn.getAttribute('data-name');
           if (btn.getAttribute('data-type') === 'plusone') {
-            if (confirm('Remove plus one "' + btn.getAttribute('data-name') + '" from the approved list?')) {
-              // For plus ones, we just notify — removal would need a separate endpoint
-              alert('Plus ones can be removed from the Manage tab under Plus One requests.');
+            if (confirm('Remove "' + gName + '" from the approved list? This will also remove their RSVP.')) {
+              await fetch('/api/admin/delete-plus-one', { method: 'POST', headers: {'Content-Type':'application/json', 'X-Admin-Password': _adminPassword}, body: JSON.stringify({ name: gName }) });
+              loadAdminData();
             }
           } else {
-            removeGuest(btn.getAttribute('data-name'));
+            removeGuest(gName);
           }
         };
       });
