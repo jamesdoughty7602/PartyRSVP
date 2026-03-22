@@ -1652,23 +1652,6 @@ ADMIN_HTML = r"""<!DOCTYPE html>
       <div class="chip-list" id="guest-chips"></div>
     </div>
 
-    <!-- Pending Approvals -->
-    <div class="card" id="pending-card">
-      <h2>&#9203; Pending Approvals</h2>
-      <div id="pending-area"></div>
-    </div>
-
-    <!-- All RSVPs -->
-    <div class="card">
-      <h2>&#128101; All RSVPs</h2>
-      <div style="overflow-x:auto">
-        <table>
-          <thead><tr><th>Name</th><th>Status</th><th>Approved</th><th>Updated</th></tr></thead>
-          <tbody id="rsvp-table"></tbody>
-        </table>
-      </div>
-    </div>
-
     <!-- Plus Ones -->
     <div class="card" id="plusones-card">
       <h2>&#128101; Plus Ones</h2>
@@ -1762,29 +1745,6 @@ ADMIN_HTML = r"""<!DOCTYPE html>
           }
         };
       });
-    }
-
-    // Pending approvals
-    const pending = data.rsvps.filter(r => r.approved === 0);
-    const pendingArea = document.getElementById('pending-area');
-    if (pending.length === 0) {
-      pendingArea.innerHTML = '<p class="empty-text">No pending approvals</p>';
-      document.getElementById('pending-card').style.display = '';
-    } else {
-      pendingArea.innerHTML = '<table><thead><tr><th>Name</th><th>Status</th><th>Actions</th></tr></thead><tbody>' +
-        pending.map(r =>
-          '<tr><td>' + (r.profile_pic ? '<img src="' + r.profile_pic + '" style="width:28px;height:28px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:8px">' : '') + esc(r.name) + '</td><td><span class="status-badge status-' + r.status + '">' + statusLabel(r.status) + '</span></td><td class="actions"><button class="action-btn approve-btn" onclick="approveRsvp(' + r.id + ')">Approve</button><button class="action-btn reject-btn" onclick="rejectRsvp(' + r.id + ')">Reject</button></td></tr>'
-        ).join('') + '</tbody></table>';
-    }
-
-    // All RSVPs table
-    const tbody = document.getElementById('rsvp-table');
-    if (data.rsvps.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="4" class="empty-text">No RSVPs yet</td></tr>';
-    } else {
-      tbody.innerHTML = data.rsvps.map(r =>
-        '<tr><td>' + (r.profile_pic ? '<img src="' + r.profile_pic + '" style="width:28px;height:28px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:8px">' : '') + esc(r.name) + '</td><td><span class="status-badge status-' + r.status + '">' + statusLabel(r.status) + '</span></td><td>' + (r.approved === 1 ? '<span class="status-badge status-going">Yes</span>' : r.approved === -1 ? '<span class="status-badge status-denied">Denied</span>' : '<span class="status-badge status-pending">Pending</span>') + '</td><td>' + (r.updated_at || '').replace('T',' ').substring(0,16) + '</td></tr>'
-      ).join('');
     }
 
     // Refresh invite table if visible
