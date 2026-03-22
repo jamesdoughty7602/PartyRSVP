@@ -1004,7 +1004,7 @@ MAIN_HTML = r"""<!DOCTYPE html>
   })();
 
   const STORAGE_KEY = 'krish_james_party_v2_name';
-  const LETTER_COLORS = {A:'#AC92EB',B:'#B89CE8',C:'#C4A6E5',D:'#9F86D9',E:'#9B7ED6',F:'#4FC1E8',G:'#5BC8EB',H:'#67CFEE',I:'#43B4DB',J:'#37A8CF',K:'#A0D568',L:'#ABD974',M:'#B6DD80',N:'#94C95C',O:'#88BD50',P:'#FFCE54',Q:'#FFD467',R:'#FFDA7A',S:'#FFC841',T:'#FFC22E',U:'#ED5564',V:'#EF6672',W:'#F17780',X:'#EB4453',Y:'#E93345',Z:'#FFD700'};
+  const LETTER_COLORS = {A:'#E74C3C',B:'#E67E22',C:'#F1C40F',D:'#2ECC71',E:'#1ABC9C',F:'#3498DB',G:'#9B59B6',H:'#E91E63',I:'#FF5722',J:'#FF9800',K:'#8BC34A',L:'#00BCD4',M:'#673AB7',N:'#F06292',O:'#D32F2F',P:'#FF7043',Q:'#CDDC39',R:'#26A69A',S:'#42A5F5',T:'#7E57C2',U:'#EC407A',V:'#FF8A65',W:'#66BB6A',X:'#FFD700',Y:'#29B6F6',Z:'#AB47BC'};
   const STATUS_LABELS = { going: 'Going', maybe: 'Maybe', cant_go: "Can't Go" };
   const STATUS_EMOJI = { going: '&#127881;', maybe: '&#129300;', cant_go: '&#128532;' };
 
@@ -1989,7 +1989,7 @@ ADMIN_HTML = r"""<!DOCTYPE html>
     });
   }
 
-  const LETTER_COLORS_ADMIN = {A:'#AC92EB',B:'#B89CE8',C:'#C4A6E5',D:'#9F86D9',E:'#9B7ED6',F:'#4FC1E8',G:'#5BC8EB',H:'#67CFEE',I:'#43B4DB',J:'#37A8CF',K:'#A0D568',L:'#ABD974',M:'#B6DD80',N:'#94C95C',O:'#88BD50',P:'#FFCE54',Q:'#FFD467',R:'#FFDA7A',S:'#FFC841',T:'#FFC22E',U:'#ED5564',V:'#EF6672',W:'#F17780',X:'#EB4453',Y:'#E93345',Z:'#FFD700'};
+  const LETTER_COLORS_ADMIN = {A:'#E74C3C',B:'#E67E22',C:'#F1C40F',D:'#2ECC71',E:'#1ABC9C',F:'#3498DB',G:'#9B59B6',H:'#E91E63',I:'#FF5722',J:'#FF9800',K:'#8BC34A',L:'#00BCD4',M:'#673AB7',N:'#F06292',O:'#D32F2F',P:'#FF7043',Q:'#CDDC39',R:'#26A69A',S:'#42A5F5',T:'#7E57C2',U:'#EC407A',V:'#FF8A65',W:'#66BB6A',X:'#FFD700',Y:'#29B6F6',Z:'#AB47BC'};
   function getAvatarColor(name) {
     const letter = (name || '?').charAt(0).toUpperCase();
     return LETTER_COLORS_ADMIN[letter] || '#999';
