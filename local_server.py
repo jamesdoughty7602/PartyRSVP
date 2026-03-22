@@ -730,7 +730,6 @@ MAIN_HTML = r"""<!DOCTYPE html>
   .socials-header h3 { font-size: 15px; font-weight: 700; color: #1a1a1a; }
   .socials-prompt { font-size: 13px; color: #999; margin-bottom: 6px; }
   .socials-subtitle { font-size: 12px; color: #bbb; margin-bottom: 14px; font-style: italic; }
-  .phone-section { margin-top: 24px; padding-top: 20px; border-top: 1px solid #eee; }
   .social-input-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
   .social-icon-label { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .social-icon-label.ig { background: linear-gradient(135deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888); }
@@ -877,15 +876,6 @@ MAIN_HTML = r"""<!DOCTYPE html>
       </div>
       <div class="error-msg" id="error-msg"></div>
       <div id="status-area"></div>
-      <div class="phone-section" id="phone-section">
-      <div class="socials-header"><h3>Get party alerts &#128242;</h3></div>
-      <p class="socials-prompt">Drop your number to stay in the loop on any updates! (optional)</p>
-      <div class="social-input-row">
-        <div class="social-icon-label" style="background:#1a1a1a"><svg viewBox="0 0 24 24" style="width:20px;height:20px;fill:#fff"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg></div>
-        <input type="tel" class="social-input" id="phone-input" placeholder="Your phone number" autocomplete="off">
-      </div>
-      <button class="save-socials-btn" onclick="savePhone()">Save Number</button>
-      </div>
       <div class="socials-section" id="socials-section">
       <div class="socials-header"><h3>Link your socials</h3></div>
       <p class="socials-prompt">Copy &amp; paste your profile links so other guests can find you! (optional)</p>
@@ -1021,12 +1011,10 @@ MAIN_HTML = r"""<!DOCTYPE html>
         const firstName = name.split(' ')[0];
         document.getElementById('rsvp-intro').querySelector('h2').innerHTML = 'Welcome back, <span class="gradient-name">' + escapeHtml(firstName) + '</span>!';
         document.getElementById('rsvp-intro').querySelector('p').textContent = 'Update your status or add your social links below.';
-        // Show socials and phone sections and populate
+        // Show socials section and populate
         document.getElementById('socials-section').style.display = '';
-        document.getElementById('phone-section').style.display = '';
         document.getElementById('ig-input').value = data.instagram || '';
         document.getElementById('fb-input').value = data.facebook || '';
-        document.getElementById('phone-input').value = data.phone || '';
       }
       // Check if any plus ones have been responded to (approved or denied)
       const poRes = await fetch('/api/plus-ones?name=' + encodeURIComponent(name));
@@ -1120,20 +1108,7 @@ MAIN_HTML = r"""<!DOCTYPE html>
     } catch (e) { showToast('Something went wrong'); }
   }
 
-  async function savePhone() {
-    const name = localStorage.getItem(STORAGE_KEY);
-    if (!name) return;
-    const phone = document.getElementById('phone-input').value.trim();
-    try {
-      const res = await fetch('/api/update-phone', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, phone })
-      });
-      if (res.ok) showToast('&#10003; Phone number saved!');
-      else showToast('Could not save — RSVP first');
-    } catch (e) { showToast('Something went wrong'); }
-  }
+
 
   async function submitRsvp(status) {
     const input = document.getElementById('name-input');
@@ -1175,9 +1150,8 @@ MAIN_HTML = r"""<!DOCTYPE html>
         showToast('&#9203; RSVP submitted — awaiting approval', 3500);
       }
       refreshMyStatus();
-      // Show socials and phone sections after first RSVP
+      // Show socials section after first RSVP
       document.getElementById('socials-section').style.display = '';
-      document.getElementById('phone-section').style.display = '';
     } catch (err) {
       errEl.textContent = err.message;
     } finally {
@@ -1611,18 +1585,6 @@ ADMIN_HTML = r"""<!DOCTYPE html>
       <div id="admin-guest-list-container"></div>
     </div>
 
-    <div class="card">
-      <h2>&#128242; Phone Numbers &amp; Alerts</h2>
-      <div id="phone-list-area"></div>
-      <div style="margin-top:16px;border-top:1px solid #eee;padding-top:16px;">
-        <p style="color:#777;font-size:14px;margin-bottom:10px;">Send a note to all guests who provided a phone number:</p>
-        <div class="add-form">
-          <input type="text" id="alert-message" placeholder="Type your alert message...">
-          <button onclick="sendAlert()">Send Alert</button>
-        </div>
-        <div id="alert-result" style="margin-top:10px;"></div>
-      </div>
-    </div>
   </div>
 </div>
 
@@ -1827,7 +1789,7 @@ ADMIN_HTML = r"""<!DOCTYPE html>
     });
     if (tab === 'invitelinks') renderInviteTable();
     if (tab === 'plusonelinks') renderPlusOneInviteTable();
-    if (tab === 'guestlist') { renderAdminGuestList(); renderPhoneList(); }
+    if (tab === 'guestlist') { renderAdminGuestList(); }
   }
 
   let _adminData = null;
@@ -1996,47 +1958,6 @@ ADMIN_HTML = r"""<!DOCTYPE html>
       const detailsRow = '<tr><td colspan="3" style="padding:4px 12px 14px;border-bottom:2px solid #eee"><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px"><span style="font-size:11px;color:#999;font-weight:600">SOCIALS & PHONE:</span></div><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px">' + igTick + '<input type="text" id="po-ig-' + p.id + '" value="' + esc(igVal).replace(/"/g, '&quot;') + '" placeholder="Instagram URL" style="padding:4px 8px;font-size:12px;border:1px solid #e8e6e3;border-radius:6px;flex:1;min-width:100px">' + fbTick + '<input type="text" id="po-fb-' + p.id + '" value="' + esc(fbVal).replace(/"/g, '&quot;') + '" placeholder="Facebook URL" style="padding:4px 8px;font-size:12px;border:1px solid #e8e6e3;border-radius:6px;flex:1;min-width:100px"></div><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">' + phoneTick + '<input type="text" id="po-phone-' + p.id + '" value="' + esc(phoneVal).replace(/"/g, '&quot;') + '" placeholder="Phone number" style="padding:4px 8px;font-size:12px;border:1px solid #e8e6e3;border-radius:6px;flex:1;min-width:100px"><button class="action-btn approve-btn" style="font-size:11px;padding:4px 10px" onclick="savePlusOneDetails(' + p.id + ')">Save</button></div></td></tr>';
       return mainRow + detailsRow;
     }).join('');
-  }
-
-  function renderPhoneList() {
-    if (!_adminData) return;
-    const area = document.getElementById('phone-list-area');
-    const rsvps = _adminData.rsvps.filter(r => r.approved === 1);
-    if (rsvps.length === 0) {
-      area.innerHTML = '<p class="empty-text">No approved RSVPs yet</p>';
-      return;
-    }
-    let html = '<table><thead><tr><th>Name</th><th>Phone</th><th>Status</th></tr></thead><tbody>';
-    rsvps.forEach(r => {
-      const phone = r.phone ? esc(r.phone) : '<span style="color:#bbb;font-style:italic">Not provided</span>';
-      html += '<tr><td><strong>' + esc(r.name) + '</strong></td><td>' + phone + '</td><td><span class="status-badge status-' + r.status + '">' + statusLabel(r.status) + '</span></td></tr>';
-    });
-    html += '</tbody></table>';
-    area.innerHTML = html;
-  }
-
-  async function sendAlert() {
-    const input = document.getElementById('alert-message');
-    const message = input.value.trim();
-    if (!message) return;
-    try {
-      const res = await fetch('/api/admin/send-alert', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        input.value = '';
-        const resultArea = document.getElementById('alert-result');
-        if (data.sent_to > 0) {
-          resultArea.innerHTML = '<div style="padding:12px;background:#e8f8ef;border-radius:10px;font-size:14px;color:#1a7a42">&#10003; Alert logged for ' + data.sent_to + ' guest(s): ' + data.recipients.map(r => esc(r.name)).join(', ') + '</div>';
-        } else {
-          resultArea.innerHTML = '<div style="padding:12px;background:#fff8e6;border-radius:10px;font-size:14px;color:#9a7b20">No guests have provided phone numbers yet.</div>';
-        }
-        showToast('Alert sent!');
-      }
-    } catch (e) { showToast('Failed to send alert'); }
   }
 
   async function saveGuestDetails(guestId) {
