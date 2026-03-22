@@ -1102,8 +1102,8 @@ MAIN_HTML = r"""<!DOCTYPE html>
         document.getElementById('rsvp-intro').querySelector('h2').innerHTML = 'Welcome back, <span class="gradient-name">' + escapeHtml(firstName) + '</span>!';
         document.getElementById('rsvp-intro').querySelector('p').textContent = '';
         document.getElementById('socials-section').style.display = '';
-        document.getElementById('ig-input').value = data.instagram || '';
-        document.getElementById('fb-input').value = data.facebook || '';
+        document.getElementById('ig-input').value = data.instagram || data.host_instagram || '';
+        document.getElementById('fb-input').value = data.facebook || data.host_facebook || '';
         if (data.host_instagram) {
           const igInput = document.getElementById('ig-input');
           igInput.readOnly = true;
