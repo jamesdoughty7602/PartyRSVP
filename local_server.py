@@ -268,7 +268,8 @@ class Handler(BaseHTTPRequestHandler):
 
             conn = get_db()
             on_list = conn.execute("SELECT 1 FROM guest_list WHERE name = ? COLLATE NOCASE", (name,)).fetchone()
-            approved = 1 if on_list else 0
+            is_approved_plus_one = conn.execute("SELECT 1 FROM plus_ones WHERE name = ? COLLATE NOCASE AND approved = 1", (name,)).fetchone()
+            approved = 1 if (on_list or is_approved_plus_one) else 0
 
             existing = conn.execute("SELECT id FROM rsvps WHERE name = ? COLLATE NOCASE", (name,)).fetchone()
             if existing:

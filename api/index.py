@@ -286,7 +286,9 @@ def api_rsvp():
     cur = conn.cursor()
     cur.execute("SELECT 1 FROM guest_list WHERE LOWER(name) = LOWER(%s)", (name,))
     on_list = cur.fetchone()
-    approved = 1 if on_list else 0
+    cur.execute("SELECT 1 FROM plus_ones WHERE LOWER(name) = LOWER(%s) AND approved = 1", (name,))
+    is_approved_plus_one = cur.fetchone()
+    approved = 1 if (on_list or is_approved_plus_one) else 0
 
     cur.execute("SELECT id FROM rsvps WHERE LOWER(name) = LOWER(%s)", (name,))
     existing = cur.fetchone()
