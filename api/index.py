@@ -268,14 +268,14 @@ def api_admin_data():
     cur.execute("SELECT id, message, created_at FROM announcements ORDER BY created_at DESC")
     announcements = cur.fetchall()
     conn.close()
-    # Convert timestamps to strings
+    # Convert timestamps to strings (append +00:00 so browser treats as UTC and converts to local)
     for r in rsvps:
-        r["created_at"] = str(r["created_at"]) if r["created_at"] else ""
-        r["updated_at"] = str(r["updated_at"]) if r["updated_at"] else ""
+        r["created_at"] = (str(r["created_at"]) + "+00:00") if r["created_at"] else ""
+        r["updated_at"] = (str(r["updated_at"]) + "+00:00") if r["updated_at"] else ""
     for p in plus_ones:
-        p["created_at"] = str(p["created_at"]) if p["created_at"] else ""
+        p["created_at"] = (str(p["created_at"]) + "+00:00") if p["created_at"] else ""
     for a in announcements:
-        a["created_at"] = str(a["created_at"]) if a["created_at"] else ""
+        a["created_at"] = (str(a["created_at"]) + "+00:00") if a["created_at"] else ""
     return jsonify({"guest_list": guest_list, "rsvps": rsvps, "plus_ones": plus_ones, "announcements": announcements})
 
 
@@ -649,7 +649,7 @@ def api_announcements():
     rows = cur.fetchall()
     conn.close()
     for r in rows:
-        r["created_at"] = str(r["created_at"]) if r["created_at"] else ""
+        r["created_at"] = (str(r["created_at"]) + "+00:00") if r["created_at"] else ""
     return jsonify({"announcements": rows})
 
 
