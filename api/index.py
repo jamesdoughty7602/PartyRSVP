@@ -1063,7 +1063,7 @@ MAIN_HTML = r"""<!DOCTYPE html>
       <div class="detail-icon">&#128205;</div>
       <div class="detail-text"><span class="detail-label">Location</span><span class="detail-value">50 Hordern St, Newtown</span></div>
     </div>
-    <div class="byob-msg">&#127867; BYO drinks! Last time they disappeared faster than the gossip — so bring enough to share (or at least enough to survive) &#128514;</div>
+    <div class="byob-msg">Drinks will be around, but BYO is the move &#127867;</div>
   </div>
 
   <div class="tabs">
