@@ -95,9 +95,28 @@ def init_db():
     cur.execute("""CREATE TABLE IF NOT EXISTS announcements (
         id SERIAL PRIMARY KEY,
         message TEXT NOT NULL,
+        photo TEXT DEFAULT '',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )""")
+    cur.execute("""CREATE TABLE IF NOT EXISTS announcement_views (
+        id SERIAL PRIMARY KEY,
+        announcement_id INTEGER NOT NULL,
+        invite_token TEXT NOT NULL,
+        guest_name TEXT NOT NULL,
+        viewed_at TIMESTAMP DEFAULT NOW()
+    )""")
+    cur.execute("""
+        DO $$ BEGIN
+            CREATE UNIQUE INDEX idx_announcement_views_unique ON announcement_views (announcement_id, invite_token);
+        EXCEPTION WHEN duplicate_table THEN NULL;
+        END $$;
+    """)
     conn.commit()
+    try:
+        cur.execute("ALTER TABLE announcements ADD COLUMN photo TEXT DEFAULT ''")
+        conn.commit()
+    except Exception:
+        conn.rollback()
     # Backfill invite tokens for guests that don't have one
     cur.execute("SELECT id FROM guest_list WHERE invite_token IS NULL")
     for row in cur.fetchall():
@@ -164,7 +183,7 @@ def rsvp_page():
             guest = cur.fetchone()
         conn.close()
         if guest:
-            prefill_script = f'<script>window.__INVITE_NAME={json.dumps(guest["name"])};localStorage.setItem("krish_james_party_v2_name",window.__INVITE_NAME);</script>'
+            prefill_script = f'<script>window.__INVITE_NAME={json.dumps(guest["name"])};window.__INVITE_TOKEN={json.dumps(invite_token)};localStorage.setItem("krish_james_party_v2_name",window.__INVITE_NAME);localStorage.setItem("krish_james_party_v2_token",window.__INVITE_TOKEN);</script>'
             html = MAIN_HTML.replace('<head>', '<head>' + prefill_script, 1)
             return make_response(html, 200, {"Content-Type": "text/html; charset=utf-8"})
     return make_response(MAIN_HTML, 200, {"Content-Type": "text/html; charset=utf-8"})
@@ -265,8 +284,10 @@ def api_admin_data():
     rsvps = cur.fetchall()
     cur.execute("SELECT id, added_by, name, phone, invite_token, approved, created_at FROM plus_ones ORDER BY LOWER(added_by), created_at DESC")
     plus_ones = cur.fetchall()
-    cur.execute("SELECT id, message, created_at FROM announcements ORDER BY created_at DESC")
+    cur.execute("SELECT id, message, photo, created_at FROM announcements ORDER BY created_at DESC")
     announcements = cur.fetchall()
+    cur.execute("SELECT announcement_id, COUNT(*) as view_count FROM announcement_views GROUP BY announcement_id")
+    view_counts = {r["announcement_id"]: r["view_count"] for r in cur.fetchall()}
     conn.close()
     # Convert timestamps to strings (append +00:00 so browser treats as UTC and converts to local)
     for r in rsvps:
@@ -276,6 +297,7 @@ def api_admin_data():
         p["created_at"] = (str(p["created_at"]) + "+00:00") if p["created_at"] else ""
     for a in announcements:
         a["created_at"] = (str(a["created_at"]) + "+00:00") if a["created_at"] else ""
+        a["view_count"] = view_counts.get(a["id"], 0)
     return jsonify({"guest_list": guest_list, "rsvps": rsvps, "plus_ones": plus_ones, "announcements": announcements})
 
 
@@ -645,12 +667,58 @@ def api_admin_delete_plus_one():
 def api_announcements():
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("SELECT id, message, created_at FROM announcements ORDER BY created_at DESC")
+    cur.execute("SELECT id, message, photo, created_at FROM announcements ORDER BY created_at DESC")
     rows = cur.fetchall()
     conn.close()
     for r in rows:
         r["created_at"] = (str(r["created_at"]) + "+00:00") if r["created_at"] else ""
     return jsonify({"announcements": rows})
+
+
+@app.route("/api/mark-seen", methods=["POST"])
+def api_mark_seen():
+    body = request.get_json(force=True)
+    token = body.get("token", "").strip()
+    announcement_ids = body.get("announcement_ids", [])
+    if not token or not announcement_ids:
+        return jsonify({"ok": True})
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT name FROM guest_list WHERE invite_token = %s", (token,))
+    guest = cur.fetchone()
+    if not guest:
+        cur.execute("SELECT name FROM plus_ones WHERE invite_token = %s AND approved = 1", (token,))
+        guest = cur.fetchone()
+    if not guest:
+        conn.close()
+        return jsonify({"ok": True})
+    guest_name = guest["name"]
+    for aid in announcement_ids:
+        try:
+            cur.execute(
+                "INSERT INTO announcement_views (announcement_id, invite_token, guest_name) VALUES (%s, %s, %s) ON CONFLICT (announcement_id, invite_token) DO NOTHING",
+                (aid, token, guest_name)
+            )
+        except Exception:
+            pass
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/admin/announcement-views")
+def api_admin_announcement_views():
+    if not check_admin():
+        return jsonify({"error": "Unauthorized"}), 401
+    ann_id = request.args.get("id")
+    if not ann_id:
+        return jsonify({"error": "ID required"}), 400
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT guest_name, viewed_at FROM announcement_views WHERE announcement_id = %s ORDER BY viewed_at DESC", (ann_id,))
+    rows = cur.fetchall()
+    conn.close()
+    return jsonify({"viewers": [{"name": r["guest_name"], "viewed_at": (str(r["viewed_at"]) + "+00:00") if r["viewed_at"] else ""} for r in rows]})
 
 
 @app.route("/api/admin/announcement", methods=["POST"])
@@ -659,11 +727,12 @@ def api_admin_post_announcement():
         return jsonify({"error": "Unauthorized"}), 401
     body = request.get_json(force=True)
     message = body.get("message", "").strip()
-    if not message:
-        return jsonify({"error": "Message is required"}), 400
+    photo = body.get("photo", "")
+    if not message and not photo:
+        return jsonify({"error": "Message or photo is required"}), 400
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("INSERT INTO announcements (message) VALUES (%s)", (message,))
+    cur.execute("INSERT INTO announcements (message, photo) VALUES (%s, %s)", (message, photo))
     conn.commit()
     conn.close()
     return jsonify({"ok": True})
@@ -1586,8 +1655,18 @@ MAIN_HTML = r"""<!DOCTYPE html>
           const ampm = h >= 12 ? 'PM' : 'AM';
           const h12 = h % 12 || 12;
           const timeStr = months[d.getMonth()] + ' ' + d.getDate() + ' at ' + h12 + ':' + (m < 10 ? '0' : '') + m + ' ' + ampm;
-          return '<div style="background:#f9f8f6;border-radius:12px;padding:14px 16px;margin-bottom:10px"><div style="font-size:14px;line-height:1.5">' + escapeHtml(a.message) + '</div><div style="font-size:11px;color:#999;margin-top:6px">' + timeStr + '</div></div>';
+          const photoHtml = a.photo ? '<div style="margin-top:8px"><img src="' + a.photo + '" style="max-width:100%;border-radius:10px"></div>' : '';
+          return '<div style="background:#f9f8f6;border-radius:12px;padding:14px 16px;margin-bottom:10px"><div style="font-size:14px;line-height:1.5">' + escapeHtml(a.message) + '</div>' + photoHtml + '<div style="font-size:11px;color:#999;margin-top:6px">' + timeStr + '</div></div>';
         }).join('');
+        // Mark announcements as seen if guest has an invite token
+        const token = localStorage.getItem('krish_james_party_v2_token');
+        if (token && data.announcements.length > 0) {
+          fetch('/api/mark-seen', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({token: token, announcement_ids: data.announcements.map(a => a.id)})
+          }).catch(() => {});
+        }
       } else {
         section.style.display = 'none';
       }
@@ -1804,10 +1883,15 @@ ADMIN_HTML = r"""<!DOCTYPE html>
     <div class="card">
       <h3>&#128203; Party Updates</h3>
       <p style="color:#999;font-size:13px;margin-bottom:16px">Post updates that all guests will see on their RSVP page</p>
-      <div style="display:flex;gap:8px;margin-bottom:16px">
+      <div style="display:flex;gap:8px;margin-bottom:8px">
         <textarea id="announcement-input" placeholder="e.g. It's raining — bring jackets! &#9748;&#65039;" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'" style="flex:1;padding:10px 14px;font-size:14px;border:1px solid #e8e6e3;border-radius:12px;resize:none;min-height:60px;overflow:hidden;font-family:inherit"></textarea>
-        <button onclick="postAnnouncement()" style="padding:10px 20px;background:#222;color:#fff;border:none;border-radius:12px;font-weight:600;cursor:pointer;white-space:nowrap;align-self:flex-start">Post</button>
+        <div style="display:flex;flex-direction:column;gap:6px;align-self:flex-start">
+          <button onclick="postAnnouncement()" style="padding:10px 20px;background:#222;color:#fff;border:none;border-radius:12px;font-weight:600;cursor:pointer;white-space:nowrap">Post</button>
+          <button onclick="document.getElementById('announcement-photo-input').click()" style="padding:8px 12px;background:#f5f4f2;color:#666;border:1px solid #e8e6e3;border-radius:10px;font-size:12px;cursor:pointer;white-space:nowrap" title="Attach photo">&#128247; Photo</button>
+        </div>
       </div>
+      <input type="file" id="announcement-photo-input" accept="image/*" style="display:none" onchange="handleAnnouncementPhoto(this)">
+      <div id="announcement-photo-preview" style="margin-bottom:12px"></div>
       <div id="admin-announcements-list"></div>
     </div>
   </div>
@@ -2275,18 +2359,52 @@ ADMIN_HTML = r"""<!DOCTYPE html>
     } catch (e) { showToast('Failed to save'); }
   }
 
+  window._announcementPhoto = '';
+
+  function handleAnnouncementPhoto(input) {
+    if (!input.files || !input.files[0]) return;
+    const file = input.files[0];
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const img = new Image();
+      img.onload = function() {
+        const canvas = document.createElement('canvas');
+        let w = img.width, h = img.height;
+        const maxDim = 800;
+        if (w > h) { if (w > maxDim) { h = h * maxDim / w; w = maxDim; } }
+        else { if (h > maxDim) { w = w * maxDim / h; h = maxDim; } }
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        window._announcementPhoto = canvas.toDataURL('image/jpeg', 0.7);
+        const preview = document.getElementById('announcement-photo-preview');
+        preview.innerHTML = '<div style="position:relative;display:inline-block"><img src="' + window._announcementPhoto + '" style="max-width:200px;border-radius:8px;border:1px solid #e8e6e3"><button onclick="clearAnnouncementPhoto()" style="position:absolute;top:-6px;right:-6px;background:#c0392b;color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:12px;cursor:pointer;line-height:20px">&times;</button></div>';
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function clearAnnouncementPhoto() {
+    window._announcementPhoto = '';
+    document.getElementById('announcement-photo-preview').innerHTML = '';
+    document.getElementById('announcement-photo-input').value = '';
+  }
+
   async function postAnnouncement() {
     const input = document.getElementById('announcement-input');
     const message = input.value.trim();
-    if (!message) return;
+    const photo = window._announcementPhoto || '';
+    if (!message && !photo) return;
     try {
       const res = await fetch('/api/admin/announcement', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message })
+        body: JSON.stringify({ message, photo })
       });
       if (res.ok) {
         input.value = '';
+        input.style.height = 'auto';
+        clearAnnouncementPhoto();
         showToast('Update posted');
         loadData();
       } else { showToast('Failed to post'); }
@@ -2308,6 +2426,19 @@ ADMIN_HTML = r"""<!DOCTYPE html>
     } catch (e) { showToast('Something went wrong'); }
   }
 
+  async function showAnnouncementViewers(id) {
+    try {
+      const res = await fetch('/api/admin/announcement-views?id=' + id);
+      const data = await res.json();
+      const viewers = data.viewers || [];
+      if (viewers.length === 0) {
+        alert('No one has seen this update yet.');
+        return;
+      }
+      alert('Seen by:\\n' + viewers.map(v => '  - ' + v.name).join('\\n'));
+    } catch (e) { alert('Could not load viewers'); }
+  }
+
   function renderAnnouncements() {
     if (!_adminData) return;
     const list = document.getElementById('admin-announcements-list');
@@ -2323,7 +2454,9 @@ ADMIN_HTML = r"""<!DOCTYPE html>
       const ampm = h >= 12 ? 'PM' : 'AM';
       const h12 = h % 12 || 12;
       const timeStr = months[d.getMonth()] + ' ' + d.getDate() + ' at ' + h12 + ':' + (m < 10 ? '0' : '') + m + ' ' + ampm;
-      return '<div style="background:#f9f8f6;border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:flex-start;gap:10px"><div style="flex:1"><div style="font-size:14px;line-height:1.5">' + esc(a.message) + '</div><div style="font-size:11px;color:#999;margin-top:4px">' + timeStr + '</div></div><button onclick="deleteAnnouncement(' + a.id + ')" style="background:none;border:none;color:#c0392b;font-size:18px;cursor:pointer;padding:0 4px;font-weight:700;flex-shrink:0" title="Delete">&times;</button></div>';
+      const photoHtml = a.photo ? '<div style="margin-top:8px"><img src="' + a.photo + '" style="max-width:200px;border-radius:8px"></div>' : '';
+      const seenHtml = '<span onclick="showAnnouncementViewers(' + a.id + ')" style="cursor:pointer;color:#3498db;font-size:11px;margin-left:8px" title="Click to see who">&#128065; Seen by ' + (a.view_count || 0) + '</span>';
+      return '<div style="background:#f9f8f6;border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:flex-start;gap:10px"><div style="flex:1"><div style="font-size:14px;line-height:1.5">' + esc(a.message) + '</div>' + photoHtml + '<div style="font-size:11px;color:#999;margin-top:4px">' + timeStr + seenHtml + '</div></div><button onclick="deleteAnnouncement(' + a.id + ')" style="background:none;border:none;color:#c0392b;font-size:18px;cursor:pointer;padding:0 4px;font-weight:700;flex-shrink:0" title="Delete">&times;</button></div>';
     }).join('');
   }
 
