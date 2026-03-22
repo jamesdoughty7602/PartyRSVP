@@ -1484,7 +1484,7 @@ ADMIN_HTML = r"""<!DOCTYPE html>
 
   .chip-list { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
   .chip { display: flex; align-items: center; gap: 6px; background: #f0eee9; padding: 8px 14px; border-radius: 100px; font-size: 14px; font-weight: 500; }
-  .chip .remove { background: none; border: none; color: #c0392b; font-size: 16px; cursor: pointer; padding: 0 2px; font-weight: 700; }
+  .chip .remove { background: none; border: none; color: #c0392b; font-size: 16px; cursor: pointer; padding: 0 2px; font-weight: 700; margin-left: auto; }
 
   table { width: 100%; border-collapse: collapse; font-size: 14px; }
   th { text-align: left; font-size: 12px; font-weight: 700; color: #999; text-transform: uppercase; letter-spacing: 0.05em; padding: 8px 12px; border-bottom: 2px solid #eee; }
@@ -1676,7 +1676,7 @@ ADMIN_HTML = r"""<!DOCTYPE html>
           const gName = btn.getAttribute('data-name');
           if (btn.getAttribute('data-type') === 'plusone') {
             if (confirm('Remove "' + gName + '" from the approved list? This will also remove their RSVP.')) {
-              await fetch('/api/admin/delete-plus-one', { method: 'POST', headers: {'Content-Type':'application/json', 'X-Admin-Password': _adminPassword}, body: JSON.stringify({ name: gName }) });
+              await fetch('/api/admin/delete-plus-one', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ name: gName }) });
               loadAdminData();
             }
           } else {
