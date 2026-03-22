@@ -350,9 +350,9 @@ def api_admin_update_guest_socials():
         if rsvp:
             updates = []
             params = []
-            if not rsvp["instagram"] and instagram:
+            if instagram:
                 updates.append("instagram = %s"); params.append(instagram)
-            if not rsvp["facebook"] and facebook:
+            if facebook:
                 updates.append("facebook = %s"); params.append(facebook)
             if phone:
                 updates.append("phone = %s"); params.append(phone)
