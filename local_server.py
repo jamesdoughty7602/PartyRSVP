@@ -84,6 +84,11 @@ def get_db():
         conn.execute("ALTER TABLE guest_list ADD COLUMN facebook TEXT DEFAULT ''")
     except sqlite3.OperationalError:
         pass
+    # Migrate: add profile_pic column if missing
+    try:
+        conn.execute("ALTER TABLE rsvps ADD COLUMN profile_pic TEXT DEFAULT ''")
+    except sqlite3.OperationalError:
+        pass
     # Backfill invite tokens for guests that don't have one
     guests_without_token = conn.execute("SELECT id FROM guest_list WHERE invite_token IS NULL").fetchall()
     for g in guests_without_token:
@@ -158,16 +163,16 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path == "/api/rsvps":
             conn = get_db()
             rows = conn.execute(
-                "SELECT name, status, instagram, facebook, updated_at FROM rsvps WHERE approved = 1 ORDER BY updated_at DESC"
+                "SELECT name, status, instagram, facebook, profile_pic, updated_at FROM rsvps WHERE approved = 1 ORDER BY updated_at DESC"
             ).fetchall()
             # Include approved plus ones as "going" guests
             plus_ones = conn.execute(
                 "SELECT name, created_at FROM plus_ones WHERE approved = 1 ORDER BY created_at DESC"
             ).fetchall()
             conn.close()
-            guests = [{"name": r["name"], "status": r["status"], "instagram": r["instagram"] or "", "facebook": r["facebook"] or "", "time": r["updated_at"]} for r in rows]
+            guests = [{"name": r["name"], "status": r["status"], "instagram": r["instagram"] or "", "facebook": r["facebook"] or "", "profile_pic": r["profile_pic"] or "", "time": r["updated_at"]} for r in rows]
             for p in plus_ones:
-                guests.append({"name": p["name"], "status": "going", "instagram": "", "facebook": "", "time": p["created_at"]})
+                guests.append({"name": p["name"], "status": "going", "instagram": "", "facebook": "", "profile_pic": "", "time": p["created_at"]})
             going = [g for g in guests if g["status"] == "going"]
             maybe = [g for g in guests if g["status"] == "maybe"]
             cant = [g for g in guests if g["status"] == "cant_go"]
@@ -188,10 +193,10 @@ class Handler(BaseHTTPRequestHandler):
                 json_response(self, 200, {"found": False})
                 return
             conn = get_db()
-            row = conn.execute("SELECT status, approved FROM rsvps WHERE name = ? COLLATE NOCASE", (name,)).fetchone()
+            row = conn.execute("SELECT status, approved, profile_pic FROM rsvps WHERE name = ? COLLATE NOCASE", (name,)).fetchone()
             conn.close()
             if row:
-                json_response(self, 200, {"found": True, "status": row["status"], "approved": row["approved"]})
+                json_response(self, 200, {"found": True, "status": row["status"], "approved": row["approved"], "profile_pic": row["profile_pic"] or ""})
             else:
                 json_response(self, 200, {"found": False})
         elif self.path.startswith("/api/my-status?"):
@@ -199,13 +204,13 @@ class Handler(BaseHTTPRequestHandler):
             params = parse_qs(urlparse(self.path).query)
             name = params.get("name", [""])[0].strip()
             conn = get_db()
-            row = conn.execute("SELECT status, approved, instagram, facebook, phone FROM rsvps WHERE name = ? COLLATE NOCASE", (name,)).fetchone()
+            row = conn.execute("SELECT status, approved, instagram, facebook, phone, profile_pic FROM rsvps WHERE name = ? COLLATE NOCASE", (name,)).fetchone()
             gl_row = conn.execute("SELECT instagram, facebook FROM guest_list WHERE name = ? COLLATE NOCASE", (name,)).fetchone()
             host_ig = (gl_row["instagram"] if gl_row and gl_row["instagram"] else "")
             host_fb = (gl_row["facebook"] if gl_row and gl_row["facebook"] else "")
             conn.close()
             if row:
-                json_response(self, 200, {"found": True, "status": row["status"], "approved": row["approved"], "instagram": row["instagram"] or "", "facebook": row["facebook"] or "", "phone": row["phone"] or "", "host_instagram": host_ig, "host_facebook": host_fb})
+                json_response(self, 200, {"found": True, "status": row["status"], "approved": row["approved"], "instagram": row["instagram"] or "", "facebook": row["facebook"] or "", "phone": row["phone"] or "", "profile_pic": row["profile_pic"] or "", "host_instagram": host_ig, "host_facebook": host_fb})
             else:
                 json_response(self, 200, {"found": False})
         elif self.path.startswith("/api/plus-ones?"):
@@ -230,7 +235,7 @@ class Handler(BaseHTTPRequestHandler):
                 return
             conn = get_db()
             guest_list = [dict(r) for r in conn.execute("SELECT id, name, invite_token, instagram, facebook FROM guest_list ORDER BY name COLLATE NOCASE").fetchall()]
-            rsvps = [dict(r) for r in conn.execute("SELECT id, name, status, approved, instagram, facebook, phone, created_at, updated_at FROM rsvps ORDER BY created_at DESC").fetchall()]
+            rsvps = [dict(r) for r in conn.execute("SELECT id, name, status, approved, instagram, facebook, phone, profile_pic, created_at, updated_at FROM rsvps ORDER BY created_at DESC").fetchall()]
             plus_ones = [dict(r) for r in conn.execute("SELECT id, added_by, name, phone, invite_token, approved, created_at FROM plus_ones ORDER BY added_by COLLATE NOCASE, created_at DESC").fetchall()]
             conn.close()
             json_response(self, 200, {"guest_list": guest_list, "rsvps": rsvps, "plus_ones": plus_ones})
@@ -526,6 +531,30 @@ class Handler(BaseHTTPRequestHandler):
             conn.close()
             json_response(self, 200, {"ok": True})
 
+        elif self.path == "/api/upload-photo":
+            body = read_body(self)
+            name = body.get("name", "").strip()
+            photo = body.get("photo", "").strip()
+            if not name:
+                json_response(self, 400, {"error": "Name is required"})
+                return
+            if not photo:
+                json_response(self, 400, {"error": "Photo is required"})
+                return
+            if len(photo) > 500 * 1024:
+                json_response(self, 400, {"error": "Photo too large (max 500KB)"})
+                return
+            conn = get_db()
+            existing = conn.execute("SELECT id FROM rsvps WHERE name = ? COLLATE NOCASE", (name,)).fetchone()
+            if not existing:
+                conn.close()
+                json_response(self, 404, {"error": "RSVP not found"})
+                return
+            conn.execute("UPDATE rsvps SET profile_pic = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", (photo, existing["id"]))
+            conn.commit()
+            conn.close()
+            json_response(self, 200, {"ok": True})
+
         elif self.path == "/api/admin/send-alert":
             if not check_admin_session(self.headers.get("Cookie")):
                 json_response(self, 401, {"error": "Unauthorized"})
@@ -689,6 +718,10 @@ MAIN_HTML = r"""<!DOCTYPE html>
   input[type="text"]::placeholder { color: #bbb; }
 
   .returning-name { font-family: 'DM Serif Display', Georgia, serif; font-size: 28px; font-weight: 400; color: #1a1a1a; padding: 8px 0; }
+  .returning-name-row { display: flex; align-items: center; gap: 16px; }
+  .profile-photo-upload { width: 60px; height: 60px; border-radius: 50%; border: 2px dashed #ccc; display: flex; align-items: center; justify-content: center; cursor: pointer; overflow: hidden; flex-shrink: 0; transition: border-color 0.2s; }
+  .profile-photo-upload:hover { border-color: #999; }
+  .profile-photo-upload img { width: 100%; height: 100%; object-fit: cover; }
 
   /* Plus Ones */
   .add-plusone-form { display: flex; gap: 10px; margin-bottom: 20px; }
@@ -989,10 +1022,9 @@ MAIN_HTML = r"""<!DOCTYPE html>
   async function refreshMyStatus() {
     const name = localStorage.getItem(STORAGE_KEY);
     if (!name) return;
-    // Hide the name input and show name as plain text
     const nameGroup = document.getElementById('name-group');
-    nameGroup.innerHTML = '<div class="returning-name">' + escapeHtml(name) + '</div>';
-    // Keep a hidden input so submitRsvp can still read the name
+    const cameraSvg = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>';
+    nameGroup.innerHTML = '<div class="returning-name-row"><div class="profile-photo-upload" id="profile-photo-circle" onclick="document.getElementById(\'profile-photo-input\').click()">' + cameraSvg + '</div><div class="returning-name">' + escapeHtml(name) + '</div></div><input type="file" id="profile-photo-input" accept="image/*" capture style="display:none" onchange="handleProfilePhoto(this)">';
     const hidden = document.createElement('input');
     hidden.type = 'hidden';
     hidden.id = 'name-input';
@@ -1002,6 +1034,12 @@ MAIN_HTML = r"""<!DOCTYPE html>
       const res = await fetch('/api/my-status?name=' + encodeURIComponent(name));
       const data = await res.json();
       if (data.found) {
+        if (data.profile_pic) {
+          const circle = document.getElementById('profile-photo-circle');
+          circle.innerHTML = '<img src="' + data.profile_pic + '" alt="Profile">';
+          circle.style.borderStyle = 'solid';
+          circle.style.borderColor = '#e8e6e3';
+        }
         const area = document.getElementById('status-area');
         if (data.approved === 1) {
           const statusStyle = data.status === 'maybe' ? 'maybe-status' : data.status === 'cant_go' ? 'cantgo-status' : 'approved';
@@ -1013,7 +1051,7 @@ MAIN_HTML = r"""<!DOCTYPE html>
         updateSelectedButton(data.status);
         const firstName = name.split(' ')[0];
         document.getElementById('rsvp-intro').querySelector('h2').innerHTML = 'Welcome back, <span class="gradient-name">' + escapeHtml(firstName) + '</span>!';
-        document.getElementById('rsvp-intro').querySelector('p').textContent = 'Update your status or add your social links below.';
+        document.getElementById('rsvp-intro').querySelector('p').textContent = '';
         // Show socials section and populate
         document.getElementById('socials-section').style.display = '';
         document.getElementById('ig-input').value = data.instagram || '';
@@ -1105,8 +1143,46 @@ MAIN_HTML = r"""<!DOCTYPE html>
         }
         socials += '</span>';
       }
-      return '<li><span class="avatar" style="background:' + color + '">' + escapeHtml(g.name.charAt(0).toUpperCase()) + '</span><span class="guest-name">' + escapeHtml(g.name) + '</span>' + socials + (isMe ? '<span class="guest-badge badge-you">You</span>' : '') + '</li>';
+      const avatarHtml = g.profile_pic ? '<span class="avatar" style="padding:0;overflow:hidden"><img src="' + g.profile_pic + '" style="width:100%;height:100%;object-fit:cover;border-radius:50%"></span>' : '<span class="avatar" style="background:' + color + '">' + escapeHtml(g.name.charAt(0).toUpperCase()) + '</span>';
+      return '<li>' + avatarHtml + '<span class="guest-name">' + escapeHtml(g.name) + '</span>' + socials + (isMe ? '<span class="guest-badge badge-you">You</span>' : '') + '</li>';
     }).join('') + '</ul>';
+  }
+
+  async function handleProfilePhoto(input) {
+    if (!input.files || !input.files[0]) return;
+    const file = input.files[0];
+    const name = localStorage.getItem(STORAGE_KEY);
+    if (!name) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const img = new Image();
+      img.onload = function() {
+        const canvas = document.createElement('canvas');
+        let w = img.width, h = img.height;
+        const maxDim = 200;
+        if (w > h) { if (w > maxDim) { h = h * maxDim / w; w = maxDim; } }
+        else { if (h > maxDim) { w = w * maxDim / h; h = maxDim; } }
+        canvas.width = w;
+        canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        const base64 = canvas.toDataURL('image/jpeg', 0.7);
+        fetch('/api/upload-photo', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: name, photo: base64 })
+        }).then(res => {
+          if (res.ok) {
+            const circle = document.getElementById('profile-photo-circle');
+            circle.innerHTML = '<img src="' + base64 + '" alt="Profile">';
+            circle.style.borderStyle = 'solid';
+            circle.style.borderColor = '#e8e6e3';
+            showToast('&#10003; Photo uploaded!');
+          } else { showToast('Could not upload photo'); }
+        }).catch(() => showToast('Something went wrong'));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
   }
 
   async function saveSocials() {
@@ -1662,7 +1738,7 @@ ADMIN_HTML = r"""<!DOCTYPE html>
     } else {
       pendingArea.innerHTML = '<table><thead><tr><th>Name</th><th>Status</th><th>Actions</th></tr></thead><tbody>' +
         pending.map(r =>
-          '<tr><td>' + esc(r.name) + '</td><td><span class="status-badge status-' + r.status + '">' + statusLabel(r.status) + '</span></td><td class="actions"><button class="action-btn approve-btn" onclick="approveRsvp(' + r.id + ')">Approve</button><button class="action-btn reject-btn" onclick="rejectRsvp(' + r.id + ')">Reject</button></td></tr>'
+          '<tr><td>' + (r.profile_pic ? '<img src="' + r.profile_pic + '" style="width:28px;height:28px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:8px">' : '') + esc(r.name) + '</td><td><span class="status-badge status-' + r.status + '">' + statusLabel(r.status) + '</span></td><td class="actions"><button class="action-btn approve-btn" onclick="approveRsvp(' + r.id + ')">Approve</button><button class="action-btn reject-btn" onclick="rejectRsvp(' + r.id + ')">Reject</button></td></tr>'
         ).join('') + '</tbody></table>';
     }
 
@@ -1672,7 +1748,7 @@ ADMIN_HTML = r"""<!DOCTYPE html>
       tbody.innerHTML = '<tr><td colspan="4" class="empty-text">No RSVPs yet</td></tr>';
     } else {
       tbody.innerHTML = data.rsvps.map(r =>
-        '<tr><td>' + esc(r.name) + '</td><td><span class="status-badge status-' + r.status + '">' + statusLabel(r.status) + '</span></td><td>' + (r.approved === 1 ? '<span class="status-badge status-going">Yes</span>' : r.approved === -1 ? '<span class="status-badge status-denied">Denied</span>' : '<span class="status-badge status-pending">Pending</span>') + '</td><td>' + (r.updated_at || '').replace('T',' ').substring(0,16) + '</td></tr>'
+        '<tr><td>' + (r.profile_pic ? '<img src="' + r.profile_pic + '" style="width:28px;height:28px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:8px">' : '') + esc(r.name) + '</td><td><span class="status-badge status-' + r.status + '">' + statusLabel(r.status) + '</span></td><td>' + (r.approved === 1 ? '<span class="status-badge status-going">Yes</span>' : r.approved === -1 ? '<span class="status-badge status-denied">Denied</span>' : '<span class="status-badge status-pending">Pending</span>') + '</td><td>' + (r.updated_at || '').replace('T',' ').substring(0,16) + '</td></tr>'
       ).join('');
     }
 
