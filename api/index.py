@@ -192,6 +192,7 @@ def api_rsvps():
     for p in plus_ones:
         if p["name"].lower() not in rsvp_names_set and p["name"].lower() not in invited_names:
             invited.append({"name": p["name"], "status": "invited"})
+    invited.sort(key=lambda x: x["name"].lower())
 
     going = [g for g in guests if g["status"] == "going"]
     maybe = [g for g in guests if g["status"] == "maybe"]
