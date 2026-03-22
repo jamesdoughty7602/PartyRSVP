@@ -439,13 +439,22 @@ class Handler(BaseHTTPRequestHandler):
                 json_response(self, 401, {"error": "Unauthorized"})
                 return
             body = read_body(self)
+            plus_one_id = body.get("id")
             name = body.get("name", "").strip()
-            if not name:
-                json_response(self, 400, {"error": "Name is required"})
-                return
             conn = get_db()
-            conn.execute("DELETE FROM plus_ones WHERE name = ? COLLATE NOCASE", (name,))
-            conn.execute("DELETE FROM rsvps WHERE name = ? COLLATE NOCASE", (name,))
+            if plus_one_id:
+                row = conn.execute("SELECT name FROM plus_ones WHERE id = ?", (plus_one_id,)).fetchone()
+                if row:
+                    name = row["name"]
+                conn.execute("DELETE FROM plus_ones WHERE id = ?", (plus_one_id,))
+            elif name:
+                conn.execute("DELETE FROM plus_ones WHERE name = ? COLLATE NOCASE", (name,))
+            else:
+                conn.close()
+                json_response(self, 400, {"error": "ID or name is required"})
+                return
+            if name:
+                conn.execute("DELETE FROM rsvps WHERE name = ? COLLATE NOCASE", (name,))
             conn.commit()
             conn.close()
             json_response(self, 200, {"ok": True})
@@ -1782,7 +1791,8 @@ ADMIN_HTML = r"""<!DOCTYPE html>
           if (p.approved !== -1) actions += '<button class="action-btn reject-btn" onclick="rejectPlusOne(' + p.id + ')">Deny</button>';
           actions += '</div>';
           const phoneInfo = p.phone ? '<span style="font-size:12px;color:#777;margin-left:4px">(' + esc(p.phone) + ')</span>' : '';
-          html += '<div class="plusone-group-item"><span class="po-name">' + esc(p.name) + phoneInfo + '</span>' + badge + actions + '</div>';
+          const removeBtn = '<button onclick="adminDeletePlusOne(' + p.id + ')" style="background:none;border:none;color:#c0392b;font-size:18px;cursor:pointer;padding:0 4px;font-weight:700" title="Remove plus one">&times;</button>';
+          html += '<div class="plusone-group-item"><span class="po-name">' + esc(p.name) + phoneInfo + '</span>' + badge + actions + removeBtn + '</div>';
         });
         html += '</div></div>';
       });
@@ -1864,6 +1874,17 @@ ADMIN_HTML = r"""<!DOCTYPE html>
       body: JSON.stringify({ id, action: 'reject' })
     });
     showToast('Plus one rejected');
+    loadData();
+  }
+
+  async function adminDeletePlusOne(id) {
+    if (!confirm('Remove this plus one completely?')) return;
+    await fetch('/api/admin/delete-plus-one', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id })
+    });
+    showToast('Plus one removed');
     loadData();
   }
 
