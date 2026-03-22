@@ -1466,6 +1466,11 @@ MAIN_HTML = r"""<!DOCTYPE html>
     const friendName = input.value.trim();
     const friendPhone = phoneInput.value.trim();
     if (!friendName) { showToast('Please enter their name'); return; }
+    const nameParts = friendName.split(/\s+/);
+    if (nameParts.length < 2 || nameParts[nameParts.length - 1].length < 2) {
+      showToast('Please enter their full name (first & last, at least 2 characters each)');
+      return;
+    }
     if (!friendPhone) { showToast('Phone number is required for plus ones'); return; }
     try {
       const res = await fetch('/api/plus-one', {
