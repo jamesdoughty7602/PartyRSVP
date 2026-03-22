@@ -1105,7 +1105,7 @@ MAIN_HTML = r"""<!DOCTYPE html>
       </div>
       <div id="announcements-section" style="display:none">
         <hr style="border:none;border-top:1px solid #eee;margin:24px 0">
-        <h3 style="font-size:18px;font-weight:700;margin-bottom:12px">&#128203; Details</h3>
+        <h3 style="font-size:18px;font-weight:700;margin-bottom:12px">&#128226; Announcements</h3>
         <div id="announcements-list"></div>
       </div>
     </form>
