@@ -1639,10 +1639,14 @@ ADMIN_HTML = r"""<!DOCTYPE html>
     _adminData = data;
 
     const chips = document.getElementById('guest-chips');
-    const approvedPlusOnes = (data.plus_ones || []).filter(p => p.approved === 1);
+    const approvedPlusOnes = (data.plus_ones || []).filter(p => p.approved == 1);
+    const guestNames = new Set(data.guest_list.map(g => g.name.toLowerCase()));
+    const poNames = new Set(approvedPlusOnes.map(p => p.name.toLowerCase()));
+    const approvedRsvpsNotListed = data.rsvps.filter(r => r.approved == 1 && !guestNames.has(r.name.toLowerCase()) && !poNames.has(r.name.toLowerCase()));
     const allApproved = [
       ...data.guest_list.map(g => ({ name: g.name, type: 'guest' })),
-      ...approvedPlusOnes.map(p => ({ name: p.name, type: 'plusone' }))
+      ...approvedPlusOnes.map(p => ({ name: p.name, type: 'plusone' })),
+      ...approvedRsvpsNotListed.map(r => ({ name: r.name, type: 'plusone' }))
     ];
     if (allApproved.length === 0) {
       chips.innerHTML = '<span class="empty-text">No guests added yet. Add names above.</span>';
