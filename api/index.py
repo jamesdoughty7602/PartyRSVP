@@ -1426,9 +1426,8 @@ MAIN_HTML = r"""<!DOCTYPE html>
         }, delayBase + Math.random() * 500);
       }
     }
-    spawnWave(15, 0);
-    spawnWave(12, 700);
-    spawnWave(8, 1400);
+    spawnWave(5, 0);
+    spawnWave(4, 600);
   }
 
   // Plus Ones
