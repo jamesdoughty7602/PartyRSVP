@@ -1628,6 +1628,32 @@ ADMIN_HTML = r"""<!DOCTYPE html>
   .toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%) translateY(-100px); background: #1a1a1a; color: #fff; padding: 12px 20px; border-radius: 12px; font-size: 14px; font-weight: 600; box-shadow: 0 8px 32px rgba(0,0,0,0.2); z-index: 100; transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); }
   .toast.show { transform: translateX(-50%) translateY(0); }
 
+  /* Guest list styles (shared with public site) */
+  .guest-header { margin-bottom: 12px; }
+  .guest-header h2 { font-family: 'DM Serif Display', Georgia, serif; font-size: 22px; font-weight: 400; }
+  .count-pill { font-size: 12px; font-weight: 700; padding: 5px 12px; border-radius: 100px; }
+  .count-pill.going-pill { background: #e8f8ef; color: #1a7a42; }
+  .count-pill.maybe-pill { background: #fff8e6; color: #9a7b20; }
+  .count-pill.cant-pill { background: #fde8e8; color: #c0392b; }
+  .guest-section-label { font-size: 12px; font-weight: 700; color: #999; text-transform: uppercase; letter-spacing: 0.06em; margin-top: 20px; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid #f0eee9; scroll-margin-top: 60px; }
+  .guest-section-label:first-child { margin-top: 0; }
+  .guest-list { list-style: none; }
+  .guest-list li { padding: 12px 0; border-bottom: 1px solid #f0eee9; display: flex; align-items: center; gap: 14px; font-size: 15px; font-weight: 500; }
+  .guest-list li:last-child { border-bottom: none; }
+  .avatar { width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px; color: #fff; flex-shrink: 0; }
+  .avatar-clickable { cursor: pointer; transition: transform 0.3s ease, box-shadow 0.3s ease; }
+  .avatar-clickable:hover { transform: scale(1.1); }
+  .avatar-clickable.expanded { transform: scale(2.5); box-shadow: 0 4px 20px rgba(0,0,0,0.3); z-index: 100; position: relative; }
+  .guest-name { flex: 1; }
+  .guest-socials { display: flex; gap: 6px; align-items: center; }
+  .guest-social-link { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 8px; transition: transform 0.15s; text-decoration: none; }
+  .guest-social-link:hover { transform: scale(1.1); }
+  .guest-social-link.ig-link { background: linear-gradient(135deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888); }
+  .guest-social-link.fb-link { background: #1877f2; }
+  .guest-social-link svg { width: 16px; height: 16px; fill: #fff; }
+  .guest-badge { font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 100px; }
+  .badge-you { background: #f0eee9; color: #999; }
+
   @media (max-width: 600px) {
     body { padding: 12px; }
     .card { padding: 18px; }
@@ -1970,6 +1996,44 @@ ADMIN_HTML = r"""<!DOCTYPE html>
   }
   const IG_SVG = '<svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:#fff"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>';
   const FB_SVG = '<svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:#fff"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385h-3.047v-3.47h3.047v-2.642c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953h-1.514c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385c5.737-.9 10.125-5.864 10.125-11.854z"/></svg>';
+
+  function escapeHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+  function renderGuestList(guests, myName) {
+    return '<ul class="guest-list">' + guests.map(g => {
+      const color = getAvatarColor(g.name);
+      const isMe = myName && g.name.toLowerCase() === myName.toLowerCase();
+      let socials = '';
+      if (g.instagram || g.facebook) {
+        socials = '<span class="guest-socials">';
+        if (g.instagram) {
+          const igUrl = g.instagram.startsWith('http') ? g.instagram : 'https://instagram.com/' + g.instagram;
+          socials += '<a class="guest-social-link ig-link" href="' + escapeHtml(igUrl) + '" target="_blank" rel="noopener" title="Instagram">' + IG_SVG + '</a>';
+        }
+        if (g.facebook) {
+          const fbUrl = g.facebook.startsWith('http') ? g.facebook : 'https://facebook.com/' + g.facebook;
+          socials += '<a class="guest-social-link fb-link" href="' + escapeHtml(fbUrl) + '" target="_blank" rel="noopener" title="Facebook">' + FB_SVG + '</a>';
+        }
+        socials += '</span>';
+      }
+      const avatarHtml = g.profile_pic ? '<span class="avatar avatar-clickable" style="padding:0;overflow:hidden" onclick="expandAvatar(this)"><img src="' + g.profile_pic + '" style="width:100%;height:100%;object-fit:cover;border-radius:50%"></span>' : '<span class="avatar" style="background:' + color + '">' + escapeHtml(g.name.charAt(0).toUpperCase()) + '</span>';
+      return '<li>' + avatarHtml + '<span class="guest-name">' + escapeHtml(g.name) + '</span>' + socials + (isMe ? '<span class="guest-badge badge-you">You</span>' : '') + '</li>';
+    }).join('') + '</ul>';
+  }
+
+  function expandAvatar(el) {
+    if (el.classList.contains('expanded')) {
+      el.classList.remove('expanded');
+    } else {
+      document.querySelectorAll('.avatar-clickable.expanded').forEach(a => a.classList.remove('expanded'));
+      el.classList.add('expanded');
+    }
+  }
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('.avatar-clickable')) {
+      document.querySelectorAll('.avatar-clickable.expanded').forEach(a => a.classList.remove('expanded'));
+    }
+  });
 
   async function renderAdminGuestList() {
     try {
