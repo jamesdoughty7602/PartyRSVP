@@ -1465,7 +1465,7 @@ ADMIN_HTML = r"""<!DOCTYPE html>
   .add-form input:focus { border-color: #c44dff; background: #fff; }
   .add-form button { padding: 12px 20px; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 700; border: none; border-radius: 12px; background: #1a1a1a; color: #fff; cursor: pointer; white-space: nowrap; }
 
-  .chip-list { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip-list { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
   .chip { display: flex; align-items: center; gap: 6px; background: #f0eee9; padding: 8px 14px; border-radius: 100px; font-size: 14px; font-weight: 500; }
   .chip .remove { background: none; border: none; color: #c0392b; font-size: 16px; cursor: pointer; padding: 0 2px; font-weight: 700; }
 
@@ -1639,14 +1639,28 @@ ADMIN_HTML = r"""<!DOCTYPE html>
     _adminData = data;
 
     const chips = document.getElementById('guest-chips');
-    if (data.guest_list.length === 0) {
+    const approvedPlusOnes = (data.plus_ones || []).filter(p => p.approved === 1);
+    const allApproved = [
+      ...data.guest_list.map(g => ({ name: g.name, type: 'guest' })),
+      ...approvedPlusOnes.map(p => ({ name: p.name, type: 'plusone' }))
+    ];
+    if (allApproved.length === 0) {
       chips.innerHTML = '<span class="empty-text">No guests added yet. Add names above.</span>';
     } else {
-      chips.innerHTML = data.guest_list.map(g =>
-        '<span class="chip">' + esc(g.name) + ' <button class="remove" data-name="' + esc(g.name).replace(/"/g, '&quot;') + '">&times;</button></span>'
+      chips.innerHTML = allApproved.map(g =>
+        '<span class="chip' + (g.type === 'plusone' ? ' chip-plusone' : '') + '">' + esc(g.name) + (g.type === 'plusone' ? ' <span style="font-size:10px;color:#999">+1</span>' : '') + ' <button class="remove" data-name="' + esc(g.name).replace(/"/g, '&quot;') + '" data-type="' + g.type + '">&times;</button></span>'
       ).join('');
       chips.querySelectorAll('.remove[data-name]').forEach(btn => {
-        btn.onclick = () => removeGuest(btn.getAttribute('data-name'));
+        btn.onclick = () => {
+          if (btn.getAttribute('data-type') === 'plusone') {
+            if (confirm('Remove plus one "' + btn.getAttribute('data-name') + '" from the approved list?')) {
+              // For plus ones, we just notify — removal would need a separate endpoint
+              alert('Plus ones can be removed from the Manage tab under Plus One requests.');
+            }
+          } else {
+            removeGuest(btn.getAttribute('data-name'));
+          }
+        };
       });
     }
 
