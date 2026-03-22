@@ -1724,13 +1724,11 @@ ADMIN_HTML = r"""<!DOCTYPE html>
 
   <!-- GUEST LIST TAB (read-only public view) -->
   <div class="admin-panel" id="panel-guestlist">
-    <div class="card">
-      <h2>&#127881; Guest List</h2>
-      <p style="color:#777;font-size:14px;margin-bottom:16px;">This is exactly what guests see on the public site.</p>
-      <div class="count-pills" id="admin-count-pills"></div>
-      <div id="admin-guest-list-container"></div>
+    <div class="guest-header">
+      <h2>Who's Coming</h2>
     </div>
-
+    <div class="count-pills" id="admin-count-pills"></div>
+    <div id="admin-guest-list-container"></div>
   </div>
 </div>
 
@@ -1998,53 +1996,40 @@ ADMIN_HTML = r"""<!DOCTYPE html>
       const container = document.getElementById('admin-guest-list-container');
 
       pills.innerHTML = '';
-      if (data.going_count > 0) pills.innerHTML += '<span style="font-size:12px;font-weight:700;padding:5px 12px;border-radius:100px;background:#e8f8ef;color:#1a7a42">' + data.going_count + ' going</span> ';
-      if (data.maybe_count > 0) pills.innerHTML += '<span style="font-size:12px;font-weight:700;padding:5px 12px;border-radius:100px;background:#fff8e6;color:#9a7b20">' + data.maybe_count + ' maybe</span> ';
-      if (data.cant_go_count > 0) pills.innerHTML += '<span style="font-size:12px;font-weight:700;padding:5px 12px;border-radius:100px;background:#fde8e8;color:#c0392b">' + data.cant_go_count + " can't go</span> ";
+      if (data.going_count > 0) pills.innerHTML += '<span class="count-pill going-pill" style="cursor:pointer" onclick="document.getElementById(\'admin-section-going\').scrollIntoView({behavior:\'smooth\',block:\'start\'})">' + data.going_count + ' going</span>';
+      if (data.maybe_count > 0) pills.innerHTML += '<span class="count-pill maybe-pill" style="cursor:pointer" onclick="document.getElementById(\'admin-section-maybe\').scrollIntoView({behavior:\'smooth\',block:\'start\'})">' + data.maybe_count + ' maybe</span>';
+      if (data.cant_go_count > 0) pills.innerHTML += '<span class="count-pill cant-pill" style="cursor:pointer" onclick="document.getElementById(\'admin-section-cantgo\').scrollIntoView({behavior:\'smooth\',block:\'start\'})">' + data.cant_go_count + " can't go</span>";
+      if (data.invited_count > 0) pills.innerHTML += '<span class="count-pill" style="background:#f0eeeb;color:#999;cursor:pointer" onclick="document.getElementById(\'admin-section-invited\').scrollIntoView({behavior:\'smooth\',block:\'start\'})">' + data.invited_count + ' invited</span>';
 
-      if (data.guests.length === 0) {
-        container.innerHTML = '<p class="empty-text">No RSVPs yet.</p>';
+      if (data.guests.length === 0 && (!data.invited || data.invited.length === 0)) {
+        container.innerHTML = '<div class="empty-state"><div class="empty-emoji">&#128064;</div><p>No RSVPs yet.<br>Be the first to join!</p></div>';
         return;
       }
 
-      const sortAlpha = (a, b) => a.name.localeCompare(b.name);
-      const going = data.guests.filter(g => g.status === 'going').sort(sortAlpha);
-      const maybe = data.guests.filter(g => g.status === 'maybe').sort(sortAlpha);
-      const cant = data.guests.filter(g => g.status === 'cant_go').sort(sortAlpha);
-
-      function renderGroup(guests) {
-        return guests.map(g => {
-          const color = getAvatarColor(g.name);
-          let socials = '';
-          if (g.instagram || g.facebook) {
-            socials = '<span style="display:flex;gap:6px;align-items:center">';
-            if (g.instagram) {
-              const igUrl = g.instagram.startsWith('http') ? g.instagram : 'https://instagram.com/' + g.instagram;
-              socials += '<a href="' + esc(igUrl) + '" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888);text-decoration:none" title="Instagram">' + IG_SVG + '</a>';
-            }
-            if (g.facebook) {
-              const fbUrl = g.facebook.startsWith('http') ? g.facebook : 'https://facebook.com/' + g.facebook;
-              socials += '<a href="' + esc(fbUrl) + '" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:8px;background:#1877f2;text-decoration:none" title="Facebook">' + FB_SVG + '</a>';
-            }
-            socials += '</span>';
-          }
-          const avatarHtml = g.profile_pic ? '<span style="width:42px;height:42px;border-radius:50%;flex-shrink:0;overflow:hidden;display:flex"><img src="' + g.profile_pic + '" style="width:100%;height:100%;object-fit:cover;border-radius:50%"></span>' : '<span style="width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;color:#fff;flex-shrink:0;background:' + color + '">' + esc(g.name.charAt(0).toUpperCase()) + '</span>';
-          return '<div style="display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid #f0eee9">' + avatarHtml + '<span style="flex:1;font-size:15px;font-weight:500">' + esc(g.name) + '</span>' + socials + '</div>';
-        }).join('');
-      }
+      const going = data.guests.filter(g => g.status === 'going');
+      const maybe = data.guests.filter(g => g.status === 'maybe');
+      const cant = data.guests.filter(g => g.status === 'cant_go');
 
       let html = '';
       if (going.length > 0) {
-        html += '<div style="font-size:12px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:0.06em;margin-top:20px;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid #f0eee9">Going &#127881;</div>';
-        html += renderGroup(going);
+        html += '<div class="guest-section-label" id="admin-section-going">Going &#127881;</div>';
+        html += renderGuestList(going, '');
       }
       if (maybe.length > 0) {
-        html += '<div style="font-size:12px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:0.06em;margin-top:20px;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid #f0eee9">Maybe &#129300;</div>';
-        html += renderGroup(maybe);
+        html += '<div class="guest-section-label" id="admin-section-maybe">Maybe &#129300;</div>';
+        html += renderGuestList(maybe, '');
       }
       if (cant.length > 0) {
-        html += '<div style="font-size:12px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:0.06em;margin-top:20px;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid #f0eee9">Can\'t Go</div>';
-        html += renderGroup(cant);
+        html += '<div class="guest-section-label" id="admin-section-cantgo">Can\'t Go</div>';
+        html += renderGuestList(cant, '');
+      }
+      const invited = data.invited || [];
+      if (invited.length > 0) {
+        html += '<div class="guest-section-label" id="admin-section-invited" style="color:#bbb">Invited &#9993;&#65039;</div>';
+        html += '<ul class="guest-list">' + invited.map(g => {
+          const color = getAvatarColor(g.name);
+          return '<li style="opacity:0.5"><span class="avatar" style="background:' + color + '">' + escapeHtml(g.name.charAt(0).toUpperCase()) + '</span><span class="guest-name">' + escapeHtml(g.name) + '</span></li>';
+        }).join('') + '</ul>';
       }
       container.innerHTML = html;
     } catch (e) { console.error('Failed to load guest list', e); }
