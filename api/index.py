@@ -1926,7 +1926,7 @@ ADMIN_HTML = r"""<!DOCTYPE html>
 
   <!-- GUEST LIST TAB (read-only public view) -->
   <div class="admin-panel" id="panel-guestlist">
-    <div class="admin-card">
+    <div class="card">
       <div class="guest-header">
         <h2>Who's Coming</h2>
       </div>
