@@ -1656,7 +1656,7 @@ MAIN_HTML = r"""<!DOCTYPE html>
           const h12 = h % 12 || 12;
           const timeStr = months[d.getMonth()] + ' ' + d.getDate() + ' at ' + h12 + ':' + (m < 10 ? '0' : '') + m + ' ' + ampm;
           const photoHtml = a.photo ? '<div style="margin-top:8px"><img src="' + a.photo + '" style="max-width:100%;border-radius:10px"></div>' : '';
-          return '<div style="background:#f9f8f6;border-radius:12px;padding:14px 16px;margin-bottom:10px"><div style="font-size:14px;line-height:1.5">' + escapeHtml(a.message) + '</div>' + photoHtml + '<div style="font-size:11px;color:#999;margin-top:6px">' + timeStr + '</div></div>';
+          return '<div style="background:#f9f8f6;border-radius:12px;padding:14px 16px;margin-bottom:10px">' + photoHtml + '<div style="font-size:14px;line-height:1.5">' + escapeHtml(a.message) + '</div><div style="font-size:11px;color:#999;margin-top:6px">' + timeStr + '</div></div>';
         }).join('');
         // Mark announcements as seen if guest has an invite token
         const token = localStorage.getItem('krish_james_party_v2_token');
@@ -2456,7 +2456,7 @@ ADMIN_HTML = r"""<!DOCTYPE html>
       const timeStr = months[d.getMonth()] + ' ' + d.getDate() + ' at ' + h12 + ':' + (m < 10 ? '0' : '') + m + ' ' + ampm;
       const photoHtml = a.photo ? '<div style="margin-top:8px"><img src="' + a.photo + '" style="max-width:200px;border-radius:8px"></div>' : '';
       const seenHtml = '<span onclick="showAnnouncementViewers(' + a.id + ')" style="cursor:pointer;color:#3498db;font-size:11px;margin-left:8px" title="Click to see who">&#128065; Seen by ' + (a.view_count || 0) + '</span>';
-      return '<div style="background:#f9f8f6;border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:flex-start;gap:10px"><div style="flex:1"><div style="font-size:14px;line-height:1.5">' + esc(a.message) + '</div>' + photoHtml + '<div style="font-size:11px;color:#999;margin-top:4px">' + timeStr + seenHtml + '</div></div><button onclick="deleteAnnouncement(' + a.id + ')" style="background:none;border:none;color:#c0392b;font-size:18px;cursor:pointer;padding:0 4px;font-weight:700;flex-shrink:0" title="Delete">&times;</button></div>';
+      return '<div style="background:#f9f8f6;border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:flex-start;gap:10px"><div style="flex:1">' + photoHtml + '<div style="font-size:14px;line-height:1.5">' + esc(a.message) + '</div><div style="font-size:11px;color:#999;margin-top:4px">' + timeStr + seenHtml + '</div></div><button onclick="deleteAnnouncement(' + a.id + ')" style="background:none;border:none;color:#c0392b;font-size:18px;cursor:pointer;padding:0 4px;font-weight:700;flex-shrink:0" title="Delete">&times;</button></div>';
     }).join('');
   }
 
