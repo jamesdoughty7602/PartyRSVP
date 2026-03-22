@@ -2041,7 +2041,8 @@ ADMIN_HTML = r"""<!DOCTYPE html>
             }
             socials += '</span>';
           }
-          return '<div style="display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid #f0eee9"><span style="width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;color:#fff;flex-shrink:0;background:' + color + '">' + esc(g.name.charAt(0).toUpperCase()) + '</span><span style="flex:1;font-size:15px;font-weight:500">' + esc(g.name) + '</span>' + socials + '</div>';
+          const avatarHtml = g.profile_pic ? '<span style="width:42px;height:42px;border-radius:50%;flex-shrink:0;overflow:hidden;display:flex"><img src="' + g.profile_pic + '" style="width:100%;height:100%;object-fit:cover;border-radius:50%"></span>' : '<span style="width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;color:#fff;flex-shrink:0;background:' + color + '">' + esc(g.name.charAt(0).toUpperCase()) + '</span>';
+          return '<div style="display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid #f0eee9">' + avatarHtml + '<span style="flex:1;font-size:15px;font-weight:500">' + esc(g.name) + '</span>' + socials + '</div>';
         }).join('');
       }
 
