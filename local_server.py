@@ -200,9 +200,12 @@ class Handler(BaseHTTPRequestHandler):
             name = params.get("name", [""])[0].strip()
             conn = get_db()
             row = conn.execute("SELECT status, approved, instagram, facebook, phone FROM rsvps WHERE name = ? COLLATE NOCASE", (name,)).fetchone()
+            gl_row = conn.execute("SELECT instagram, facebook FROM guest_list WHERE name = ? COLLATE NOCASE", (name,)).fetchone()
+            host_ig = (gl_row["instagram"] if gl_row and gl_row["instagram"] else "")
+            host_fb = (gl_row["facebook"] if gl_row and gl_row["facebook"] else "")
             conn.close()
             if row:
-                json_response(self, 200, {"found": True, "status": row["status"], "approved": row["approved"], "instagram": row["instagram"] or "", "facebook": row["facebook"] or "", "phone": row["phone"] or ""})
+                json_response(self, 200, {"found": True, "status": row["status"], "approved": row["approved"], "instagram": row["instagram"] or "", "facebook": row["facebook"] or "", "phone": row["phone"] or "", "host_instagram": host_ig, "host_facebook": host_fb})
             else:
                 json_response(self, 200, {"found": False})
         elif self.path.startswith("/api/plus-ones?"):
@@ -1015,6 +1018,20 @@ MAIN_HTML = r"""<!DOCTYPE html>
         document.getElementById('socials-section').style.display = '';
         document.getElementById('ig-input').value = data.instagram || '';
         document.getElementById('fb-input').value = data.facebook || '';
+        if (data.host_instagram) {
+          const igInput = document.getElementById('ig-input');
+          igInput.readOnly = true;
+          igInput.style.opacity = '0.6';
+          igInput.style.cursor = 'not-allowed';
+          igInput.title = 'Pre-filled by the host';
+        }
+        if (data.host_facebook) {
+          const fbInput = document.getElementById('fb-input');
+          fbInput.readOnly = true;
+          fbInput.style.opacity = '0.6';
+          fbInput.style.cursor = 'not-allowed';
+          fbInput.title = 'Pre-filled by the host';
+        }
       }
       // Check if any plus ones have been responded to (approved or denied)
       const poRes = await fetch('/api/plus-ones?name=' + encodeURIComponent(name));

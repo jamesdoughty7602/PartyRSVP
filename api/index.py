@@ -198,9 +198,14 @@ def api_my_status():
     cur = conn.cursor()
     cur.execute("SELECT status, approved, instagram, facebook, phone FROM rsvps WHERE LOWER(name) = LOWER(%s)", (name,))
     row = cur.fetchone()
+    # Check if host pre-filled socials in guest_list
+    cur.execute("SELECT instagram, facebook FROM guest_list WHERE LOWER(name) = LOWER(%s)", (name,))
+    gl_row = cur.fetchone()
+    host_ig = (gl_row["instagram"] if gl_row and gl_row["instagram"] else "") if gl_row else ""
+    host_fb = (gl_row["facebook"] if gl_row and gl_row["facebook"] else "") if gl_row else ""
     conn.close()
     if row:
-        return jsonify({"found": True, "status": row["status"], "approved": row["approved"], "instagram": row["instagram"] or "", "facebook": row["facebook"] or "", "phone": row["phone"] or ""})
+        return jsonify({"found": True, "status": row["status"], "approved": row["approved"], "instagram": row["instagram"] or "", "facebook": row["facebook"] or "", "phone": row["phone"] or "", "host_instagram": host_ig, "host_facebook": host_fb})
     return jsonify({"found": False})
 
 
@@ -1042,6 +1047,20 @@ MAIN_HTML = r"""<!DOCTYPE html>
         document.getElementById('socials-section').style.display = '';
         document.getElementById('ig-input').value = data.instagram || '';
         document.getElementById('fb-input').value = data.facebook || '';
+        if (data.host_instagram) {
+          const igInput = document.getElementById('ig-input');
+          igInput.readOnly = true;
+          igInput.style.opacity = '0.6';
+          igInput.style.cursor = 'not-allowed';
+          igInput.title = 'Pre-filled by the host';
+        }
+        if (data.host_facebook) {
+          const fbInput = document.getElementById('fb-input');
+          fbInput.readOnly = true;
+          fbInput.style.opacity = '0.6';
+          fbInput.style.cursor = 'not-allowed';
+          fbInput.title = 'Pre-filled by the host';
+        }
       }
       const poRes = await fetch('/api/plus-ones?name=' + encodeURIComponent(name));
       const poData = await poRes.json();
