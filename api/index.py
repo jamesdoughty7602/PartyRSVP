@@ -98,14 +98,10 @@ def init_db():
     for row in cur.fetchall():
         cur.execute("UPDATE guest_list SET invite_token = %s WHERE id = %s", (secrets.token_urlsafe(12), row["id"]))
     # Backfill invite tokens for approved plus ones that don't have one
-    cur.execute("SELECT id, name, phone FROM plus_ones WHERE approved = 1 AND (invite_token IS NULL OR invite_token = '')")
+    cur.execute("SELECT id FROM plus_ones WHERE approved = 1 AND (invite_token IS NULL OR invite_token = '')")
     for row in cur.fetchall():
         token = secrets.token_urlsafe(12)
         cur.execute("UPDATE plus_ones SET invite_token = %s WHERE id = %s", (token, row["id"]))
-        # Also ensure they have an RSVP entry
-        cur.execute("SELECT id FROM rsvps WHERE LOWER(name) = LOWER(%s)", (row["name"],))
-        if not cur.fetchone():
-            cur.execute("INSERT INTO rsvps (name, status, approved, phone) VALUES (%s, 'maybe', 1, %s)", (row["name"], row["phone"] or ""))
     conn.commit()
     conn.close()
 
@@ -180,8 +176,7 @@ def api_rsvps():
     conn.close()
 
     guests = [{"name": r["name"], "status": r["status"], "instagram": r["instagram"] or "", "facebook": r["facebook"] or "", "profile_pic": r["profile_pic"] or "", "time": str(r["updated_at"])} for r in rows]
-    for p in plus_ones:
-        guests.append({"name": p["name"], "status": "going", "instagram": "", "facebook": "", "profile_pic": "", "time": str(p["created_at"])})
+    rsvp_names_set = set(g["name"].lower() for g in guests)
 
     # Get invited guests who haven't RSVP'd yet
     rsvp_names = set(g["name"].lower() for g in guests)
@@ -192,6 +187,11 @@ def api_rsvps():
     gl_rows = cur2.fetchall()
     conn2.close()
     invited = [{"name": r["name"], "status": "invited"} for r in gl_rows if r["name"].lower() not in rsvp_names]
+    # Also add approved plus ones who haven't RSVP'd yet to invited
+    invited_names = set(i["name"].lower() for i in invited)
+    for p in plus_ones:
+        if p["name"].lower() not in rsvp_names_set and p["name"].lower() not in invited_names:
+            invited.append({"name": p["name"], "status": "invited"})
 
     going = [g for g in guests if g["status"] == "going"]
     maybe = [g for g in guests if g["status"] == "maybe"]
@@ -594,14 +594,6 @@ def api_admin_approve_plus_one():
     if action == "approve":
         token = secrets.token_urlsafe(12)
         cur.execute("UPDATE plus_ones SET approved = 1, invite_token = %s WHERE id = %s", (token, plus_one_id))
-        # Auto-RSVP the plus one as "Maybe"
-        cur.execute("SELECT name, phone FROM plus_ones WHERE id = %s", (plus_one_id,))
-        po = cur.fetchone()
-        if po:
-            cur.execute("SELECT id FROM rsvps WHERE LOWER(name) = LOWER(%s)", (po["name"],))
-            existing_rsvp = cur.fetchone()
-            if not existing_rsvp:
-                cur.execute("INSERT INTO rsvps (name, status, approved, phone) VALUES (%s, 'maybe', 1, %s)", (po["name"], po["phone"] or ""))
     elif action == "reject":
         cur.execute("UPDATE plus_ones SET approved = -1 WHERE id = %s", (plus_one_id,))
     conn.commit()

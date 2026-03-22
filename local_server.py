@@ -94,13 +94,10 @@ def get_db():
     for g in guests_without_token:
         conn.execute("UPDATE guest_list SET invite_token = ? WHERE id = ?", (secrets.token_urlsafe(12), g["id"]))
     # Backfill invite tokens for approved plus ones that don't have one
-    po_without_token = conn.execute("SELECT id, name, phone FROM plus_ones WHERE approved = 1 AND (invite_token IS NULL OR invite_token = '')").fetchall()
+    po_without_token = conn.execute("SELECT id FROM plus_ones WHERE approved = 1 AND (invite_token IS NULL OR invite_token = '')").fetchall()
     for po in po_without_token:
         token = secrets.token_urlsafe(12)
         conn.execute("UPDATE plus_ones SET invite_token = ? WHERE id = ?", (token, po["id"]))
-        existing_rsvp = conn.execute("SELECT id FROM rsvps WHERE name = ? COLLATE NOCASE", (po["name"],)).fetchone()
-        if not existing_rsvp:
-            conn.execute("INSERT INTO rsvps (name, status, approved, phone) VALUES (?, 'maybe', 1, ?)", (po["name"], po["phone"] or ""))
     conn.commit()
     return conn
 
@@ -171,14 +168,18 @@ class Handler(BaseHTTPRequestHandler):
             ).fetchall()
             conn.close()
             guests = [{"name": r["name"], "status": r["status"], "instagram": r["instagram"] or "", "facebook": r["facebook"] or "", "profile_pic": r["profile_pic"] or "", "time": r["updated_at"]} for r in rows]
-            for p in plus_ones:
-                guests.append({"name": p["name"], "status": "going", "instagram": "", "facebook": "", "profile_pic": "", "time": p["created_at"]})
+            rsvp_names_set = set(g["name"].lower() for g in guests)
             # Get invited guests who haven't RSVP'd yet
             rsvp_names = set(g["name"].lower() for g in guests)
             conn2 = get_db()
             gl_rows = conn2.execute("SELECT name FROM guest_list ORDER BY name").fetchall()
             conn2.close()
             invited = [{"name": r["name"], "status": "invited"} for r in gl_rows if r["name"].lower() not in rsvp_names]
+            # Also add approved plus ones who haven't RSVP'd yet to invited
+            invited_names = set(i["name"].lower() for i in invited)
+            for p in plus_ones:
+                if p["name"].lower() not in rsvp_names_set and p["name"].lower() not in invited_names:
+                    invited.append({"name": p["name"], "status": "invited"})
             going = [g for g in guests if g["status"] == "going"]
             maybe = [g for g in guests if g["status"] == "maybe"]
             cant = [g for g in guests if g["status"] == "cant_go"]
@@ -427,11 +428,6 @@ class Handler(BaseHTTPRequestHandler):
             if action == "approve":
                 token = secrets.token_urlsafe(12)
                 conn.execute("UPDATE plus_ones SET approved = 1, invite_token = ? WHERE id = ?", (token, plus_one_id))
-                po = conn.execute("SELECT name, phone FROM plus_ones WHERE id = ?", (plus_one_id,)).fetchone()
-                if po:
-                    existing_rsvp = conn.execute("SELECT id FROM rsvps WHERE name = ? COLLATE NOCASE", (po["name"],)).fetchone()
-                    if not existing_rsvp:
-                        conn.execute("INSERT INTO rsvps (name, status, approved, phone) VALUES (?, 'maybe', 1, ?)", (po["name"], po["phone"] or ""))
             elif action == "reject":
                 conn.execute("UPDATE plus_ones SET approved = -1 WHERE id = ?", (plus_one_id,))
             conn.commit()
