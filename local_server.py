@@ -952,7 +952,7 @@ MAIN_HTML = r"""<!DOCTYPE html>
     <div id="plusone-area" class="hidden">
       <div class="add-plusone-form" style="flex-wrap:wrap">
         <input type="text" id="plusone-name" placeholder="Friend's full name" autocomplete="off" style="flex:1;min-width:140px">
-        <input type="tel" id="plusone-phone" placeholder="Their phone number" autocomplete="off" style="flex:1;min-width:140px;padding:14px 16px;font-family:'DM Sans',sans-serif;font-size:15px;border:2px solid #e8e6e3;border-radius:14px;background:#faf9f7;outline:none">
+        <input type="tel" id="plusone-phone" placeholder="Phone number" autocomplete="off" style="flex:1;min-width:140px;padding:14px 16px;font-family:'DM Sans',sans-serif;font-size:15px;border:2px solid #e8e6e3;border-radius:14px;background:#faf9f7;outline:none">
         <button class="plusone-add-btn" onclick="addPlusOne()">Add</button>
       </div>
       <p style="font-size:12px;color:#aaa;margin:-8px 0 10px 4px">📲 We'll need their number so the host can send them an invite link</p>
