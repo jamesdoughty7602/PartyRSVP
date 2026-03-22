@@ -61,7 +61,7 @@ def get_db():
     except sqlite3.OperationalError:
         pass
     try:
-        conn.execute("ALTER TABLE plus_ones ADD COLUMN invite_token TEXT UNIQUE")
+        conn.execute("ALTER TABLE plus_ones ADD COLUMN invite_token TEXT")
     except sqlite3.OperationalError:
         pass
     # Migrate: add columns if they don't exist
@@ -78,7 +78,7 @@ def get_db():
     except sqlite3.OperationalError:
         pass
     try:
-        conn.execute("ALTER TABLE guest_list ADD COLUMN invite_token TEXT UNIQUE")
+        conn.execute("ALTER TABLE guest_list ADD COLUMN invite_token TEXT")
     except sqlite3.OperationalError:
         pass
     try:
@@ -939,17 +939,17 @@ MAIN_HTML = r"""<!DOCTYPE html>
   <div class="event-details">
     <div class="detail-row">
       <div class="detail-icon">&#128197;</div>
-      <div class="detail-text"><span class="detail-label">Date</span><span class="detail-value">Saturday, April 5, 2026</span></div>
+      <div class="detail-text"><span class="detail-label">Date</span><span class="detail-value">Saturday, May 2, 2026</span></div>
     </div>
     <div class="detail-row">
       <div class="detail-icon">&#128336;</div>
-      <div class="detail-text"><span class="detail-label">Time</span><span class="detail-value">8:00 PM onwards</span></div>
+      <div class="detail-text"><span class="detail-label">Time</span><span class="detail-value">6:30 PM onwards</span></div>
     </div>
     <div class="detail-row">
       <div class="detail-icon">&#128205;</div>
-      <div class="detail-text"><span class="detail-label">Location</span><span class="detail-value">TBD - Check back soon!</span></div>
+      <div class="detail-text"><span class="detail-label">Location</span><span class="detail-value">50 Hordern St, Newtown</span></div>
     </div>
-    <div class="byob-msg">&#127865; Feel free to bring your own drinks — the more the merrier!</div>
+    <div class="byob-msg">&#127867; BYO drinks! Last time they disappeared faster than the gossip — so bring enough to share (or at least enough to survive) &#128514;</div>
   </div>
 
   <div class="tabs">
@@ -978,7 +978,7 @@ MAIN_HTML = r"""<!DOCTYPE html>
       <div class="socials-section" id="socials-section">
       <div class="socials-header"><h3>Link your socials</h3></div>
       <p class="socials-prompt">Copy &amp; paste your profile links so other guests can find you! (optional)</p>
-      <p class="socials-subtitle">The host may have already filled this in for you &#128064;</p>
+      <p class="socials-subtitle">This may have already been filled out for you &#128064;</p>
       <div class="social-input-row">
         <div class="social-icon-label ig"><svg viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg></div>
         <input type="url" class="social-input" id="ig-input" placeholder="https://instagram.com/yourprofile" autocomplete="off">
@@ -1764,6 +1764,12 @@ ADMIN_HTML = r"""<!DOCTYPE html>
       <div class="chip-list" id="guest-chips"></div>
     </div>
 
+    <!-- Plus Ones -->
+    <div class="card" id="plusones-card">
+      <h2>&#128101; Plus Ones</h2>
+      <div id="plusones-area"></div>
+    </div>
+
     <div class="card">
       <h3>&#128203; Party Updates</h3>
       <p style="color:#999;font-size:13px;margin-bottom:16px">Post updates that all guests will see on their RSVP page</p>
@@ -1772,12 +1778,6 @@ ADMIN_HTML = r"""<!DOCTYPE html>
         <button onclick="postAnnouncement()" style="padding:10px 20px;background:#222;color:#fff;border:none;border-radius:12px;font-weight:600;cursor:pointer;white-space:nowrap;align-self:flex-start">Post</button>
       </div>
       <div id="admin-announcements-list"></div>
-    </div>
-
-    <!-- Plus Ones -->
-    <div class="card" id="plusones-card">
-      <h2>&#128101; Plus Ones</h2>
-      <div id="plusones-area"></div>
     </div>
   </div>
 
@@ -1788,7 +1788,7 @@ ADMIN_HTML = r"""<!DOCTYPE html>
       <p style="color:#777;font-size:14px;margin-bottom:16px;">Share unique invite links with each guest. Their name will be pre-filled when they open the link.</p>
       <div style="overflow-x:auto">
         <table>
-          <thead><tr><th>Guest Name</th><th>RSVP Status</th><th>Invite Link</th></tr></thead>
+          <thead><tr><th style="width:30px">#</th><th>Guest Name</th><th>RSVP Status</th><th>Invite Link</th></tr></thead>
           <tbody id="invite-table"></tbody>
         </table>
       </div>
@@ -1802,7 +1802,7 @@ ADMIN_HTML = r"""<!DOCTYPE html>
       <p style="color:#777;font-size:14px;margin-bottom:16px;">Share invite links with approved plus ones so they can see party details and update their RSVP.</p>
       <div style="overflow-x:auto">
         <table>
-          <thead><tr><th>Guest Name</th><th>RSVP Status</th><th>Invite Link</th></tr></thead>
+          <thead><tr><th style="width:30px">#</th><th>Guest Name</th><th>RSVP Status</th><th>Invite Link</th></tr></thead>
           <tbody id="plusone-invite-table"></tbody>
         </table>
       </div>
@@ -2024,11 +2024,11 @@ ADMIN_HTML = r"""<!DOCTYPE html>
     const baseUrl = location.origin;
 
     if (guests.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="3" class="empty-text">No guests added yet. Add guests in the Manage tab.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="4" class="empty-text">No guests added yet. Add guests in the Manage tab.</td></tr>';
       return;
     }
 
-    tbody.innerHTML = guests.map(g => {
+    tbody.innerHTML = guests.map((g, idx) => {
       const rsvp = rsvps.find(r => r.name.toLowerCase() === g.name.toLowerCase());
       const statusHtml = rsvp
         ? '<span class="status-badge status-' + rsvp.status + '">' + statusLabel(rsvp.status) + '</span>'
@@ -2036,7 +2036,7 @@ ADMIN_HTML = r"""<!DOCTYPE html>
       const inviteUrl = baseUrl + '/?invite=' + g.invite_token;
       const btnId = 'copy-' + g.id;
       const tokenTail = g.invite_token ? g.invite_token.slice(-6) : '';
-      const mainRow = '<tr><td><strong>' + esc(g.name) + '</strong></td><td>' + statusHtml + '</td><td><div style="display:flex;align-items:center;gap:8px"><button class="copy-btn" id="' + btnId + '" onclick="copyLink(\'' + esc(inviteUrl).replace(/'/g, "\\'") + '\',\'' + btnId + '\')" title="' + esc(inviteUrl) + '">Copy Link</button><span style="font-size:10px;color:#bbb;font-family:monospace">...' + esc(tokenTail) + '</span></div></td></tr>';
+      const mainRow = '<tr><td style="color:#999;font-size:13px;font-weight:600;text-align:center">' + (idx + 1) + '</td><td><strong>' + esc(g.name) + '</strong></td><td>' + statusHtml + '</td><td><div style="display:flex;align-items:center;gap:8px"><button class="copy-btn" id="' + btnId + '" onclick="copyLink(\'' + esc(inviteUrl).replace(/'/g, "\\'") + '\',\'' + btnId + '\')" title="' + esc(inviteUrl) + '">Copy Link</button><span style="font-size:10px;color:#bbb;font-family:monospace">...' + esc(tokenTail) + '</span></div></td></tr>';
       const igVal = (rsvp && rsvp.instagram) || g.instagram || '';
       const fbVal = (rsvp && rsvp.facebook) || g.facebook || '';
       const phoneVal = (rsvp && rsvp.phone) || '';
@@ -2051,7 +2051,7 @@ ADMIN_HTML = r"""<!DOCTYPE html>
       const igTick = hasIg ? '<a href="' + esc(socialLink(igVal, 'instagram')) + '" target="_blank" rel="noopener" style="color:#1a7a42;font-size:11px;text-decoration:none" title="Open profile">&#10003;</a> ' : '<span style="color:#ccc;font-size:11px">&#10007;</span> ';
       const fbTick = hasFb ? '<a href="' + esc(socialLink(fbVal, 'facebook')) + '" target="_blank" rel="noopener" style="color:#1a7a42;font-size:11px;text-decoration:none" title="Open profile">&#10003;</a> ' : '<span style="color:#ccc;font-size:11px">&#10007;</span> ';
       const phoneTick = hasPhone ? '<span style="color:#1a7a42;font-size:11px">&#10003;</span> ' : '<span style="color:#ccc;font-size:11px">&#10007;</span> ';
-      const detailsRow = '<tr><td colspan="3" style="padding:4px 12px 14px;border-bottom:2px solid #eee"><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px"><span style="font-size:11px;color:#999;font-weight:600">SOCIALS & PHONE:</span></div><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px">' + igTick + '<input type="text" id="guest-ig-' + g.id + '" value="' + esc(igVal).replace(/"/g, '&quot;') + '" placeholder="Instagram URL" style="padding:4px 8px;font-size:12px;border:1px solid #e8e6e3;border-radius:6px;flex:1;min-width:100px">' + fbTick + '<input type="text" id="guest-fb-' + g.id + '" value="' + esc(fbVal).replace(/"/g, '&quot;') + '" placeholder="Facebook URL" style="padding:4px 8px;font-size:12px;border:1px solid #e8e6e3;border-radius:6px;flex:1;min-width:100px"></div><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">' + phoneTick + '<input type="text" id="guest-phone-' + g.id + '" value="' + esc(phoneVal).replace(/"/g, '&quot;') + '" placeholder="Phone number" style="padding:4px 8px;font-size:12px;border:1px solid #e8e6e3;border-radius:6px;flex:1;min-width:100px"><button class="action-btn approve-btn" style="font-size:11px;padding:4px 10px" onclick="saveGuestDetails(' + g.id + ')">Save</button></div></td></tr>';
+      const detailsRow = '<tr><td colspan="4" style="padding:4px 12px 14px;border-bottom:2px solid #eee"><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px"><span style="font-size:11px;color:#999;font-weight:600">SOCIALS & PHONE:</span></div><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px">' + igTick + '<input type="text" id="guest-ig-' + g.id + '" value="' + esc(igVal).replace(/"/g, '&quot;') + '" placeholder="Instagram URL" style="padding:4px 8px;font-size:12px;border:1px solid #e8e6e3;border-radius:6px;flex:1;min-width:100px">' + fbTick + '<input type="text" id="guest-fb-' + g.id + '" value="' + esc(fbVal).replace(/"/g, '&quot;') + '" placeholder="Facebook URL" style="padding:4px 8px;font-size:12px;border:1px solid #e8e6e3;border-radius:6px;flex:1;min-width:100px"></div><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">' + phoneTick + '<input type="text" id="guest-phone-' + g.id + '" value="' + esc(phoneVal).replace(/"/g, '&quot;') + '" placeholder="Phone number" style="padding:4px 8px;font-size:12px;border:1px solid #e8e6e3;border-radius:6px;flex:1;min-width:100px"><button class="action-btn approve-btn" style="font-size:11px;padding:4px 10px" onclick="saveGuestDetails(' + g.id + ')">Save</button></div></td></tr>';
       return mainRow + detailsRow;
     }).join('');
   }
@@ -2176,11 +2176,11 @@ ADMIN_HTML = r"""<!DOCTYPE html>
     const baseUrl = location.origin;
 
     if (plusOnes.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="3" class="empty-text">No approved plus ones yet.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="4" class="empty-text">No approved plus ones yet.</td></tr>';
       return;
     }
 
-    tbody.innerHTML = plusOnes.map(p => {
+    tbody.innerHTML = plusOnes.map((p, idx) => {
       const rsvp = rsvps.find(r => r.name.toLowerCase() === p.name.toLowerCase());
       const statusHtml = rsvp
         ? '<span class="status-badge status-' + rsvp.status + '">' + statusLabel(rsvp.status) + '</span>'
@@ -2188,7 +2188,7 @@ ADMIN_HTML = r"""<!DOCTYPE html>
       const inviteUrl = p.invite_token ? baseUrl + '/?invite=' + p.invite_token : '';
       const btnId = 'po-copy-' + p.id;
       const tokenTail = p.invite_token ? p.invite_token.slice(-6) : '';
-      const mainRow = '<tr><td><strong>' + esc(p.name) + '</strong><div style="font-size:10px;color:#999;margin-top:2px">Added by ' + esc(p.added_by) + '</div></td><td>' + statusHtml + '</td><td>' + (inviteUrl ? '<div style="display:flex;align-items:center;gap:8px"><button class="copy-btn" id="' + btnId + '" onclick="copyLink(\'' + esc(inviteUrl).replace(/'/g, "\\'") + '\',\'' + btnId + '\')" title="' + esc(inviteUrl) + '">Copy Link</button><span style="font-size:10px;color:#bbb;font-family:monospace">...' + esc(tokenTail) + '</span></div>' : '<span class="no-rsvp">No link</span>') + '</td></tr>';
+      const mainRow = '<tr><td style="color:#999;font-size:13px;font-weight:600;text-align:center">' + (idx + 1) + '</td><td><strong>' + esc(p.name) + '</strong><div style="font-size:10px;color:#999;margin-top:2px">Added by ' + esc(p.added_by) + '</div></td><td>' + statusHtml + '</td><td>' + (inviteUrl ? '<div style="display:flex;align-items:center;gap:8px"><button class="copy-btn" id="' + btnId + '" onclick="copyLink(\'' + esc(inviteUrl).replace(/'/g, "\\'") + '\',\'' + btnId + '\')" title="' + esc(inviteUrl) + '">Copy Link</button><span style="font-size:10px;color:#bbb;font-family:monospace">...' + esc(tokenTail) + '</span></div>' : '<span class="no-rsvp">No link</span>') + '</td></tr>';
 
       const igVal = (rsvp && rsvp.instagram) || '';
       const fbVal = (rsvp && rsvp.facebook) || '';
@@ -2203,7 +2203,7 @@ ADMIN_HTML = r"""<!DOCTYPE html>
       const igTick = hasIg ? '<a href="' + esc(socialLink(igVal, 'instagram')) + '" target="_blank" rel="noopener" style="color:#1a7a42;font-size:11px;text-decoration:none" title="Open profile">&#10003;</a> ' : '<span style="color:#ccc;font-size:11px">&#10007;</span> ';
       const fbTick = hasFb ? '<a href="' + esc(socialLink(fbVal, 'facebook')) + '" target="_blank" rel="noopener" style="color:#1a7a42;font-size:11px;text-decoration:none" title="Open profile">&#10003;</a> ' : '<span style="color:#ccc;font-size:11px">&#10007;</span> ';
       const phoneTick = hasPhone ? '<span style="color:#1a7a42;font-size:11px">&#10003;</span> ' : '<span style="color:#ccc;font-size:11px">&#10007;</span> ';
-      const detailsRow = '<tr><td colspan="3" style="padding:4px 12px 14px;border-bottom:2px solid #eee"><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px"><span style="font-size:11px;color:#999;font-weight:600">SOCIALS & PHONE:</span></div><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px">' + igTick + '<input type="text" id="po-ig-' + p.id + '" value="' + esc(igVal).replace(/"/g, '&quot;') + '" placeholder="Instagram URL" style="padding:4px 8px;font-size:12px;border:1px solid #e8e6e3;border-radius:6px;flex:1;min-width:100px">' + fbTick + '<input type="text" id="po-fb-' + p.id + '" value="' + esc(fbVal).replace(/"/g, '&quot;') + '" placeholder="Facebook URL" style="padding:4px 8px;font-size:12px;border:1px solid #e8e6e3;border-radius:6px;flex:1;min-width:100px"></div><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">' + phoneTick + '<input type="text" id="po-phone-' + p.id + '" value="' + esc(phoneVal).replace(/"/g, '&quot;') + '" placeholder="Phone number" style="padding:4px 8px;font-size:12px;border:1px solid #e8e6e3;border-radius:6px;flex:1;min-width:100px"><button class="action-btn approve-btn" style="font-size:11px;padding:4px 10px" onclick="savePlusOneDetails(' + p.id + ')">Save</button></div></td></tr>';
+      const detailsRow = '<tr><td colspan="4" style="padding:4px 12px 14px;border-bottom:2px solid #eee"><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px"><span style="font-size:11px;color:#999;font-weight:600">SOCIALS & PHONE:</span></div><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px">' + igTick + '<input type="text" id="po-ig-' + p.id + '" value="' + esc(igVal).replace(/"/g, '&quot;') + '" placeholder="Instagram URL" style="padding:4px 8px;font-size:12px;border:1px solid #e8e6e3;border-radius:6px;flex:1;min-width:100px">' + fbTick + '<input type="text" id="po-fb-' + p.id + '" value="' + esc(fbVal).replace(/"/g, '&quot;') + '" placeholder="Facebook URL" style="padding:4px 8px;font-size:12px;border:1px solid #e8e6e3;border-radius:6px;flex:1;min-width:100px"></div><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">' + phoneTick + '<input type="text" id="po-phone-' + p.id + '" value="' + esc(phoneVal).replace(/"/g, '&quot;') + '" placeholder="Phone number" style="padding:4px 8px;font-size:12px;border:1px solid #e8e6e3;border-radius:6px;flex:1;min-width:100px"><button class="action-btn approve-btn" style="font-size:11px;padding:4px 10px" onclick="savePlusOneDetails(' + p.id + ')">Save</button></div></td></tr>';
       return mainRow + detailsRow;
     }).join('');
   }
