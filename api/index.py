@@ -1045,7 +1045,7 @@ MAIN_HTML = r"""<!DOCTYPE html>
   <div class="hero" id="hero">
     <div class="hero-content">
       <div class="hero-emoji">&#127881;</div>
-      <h1>Krish and James<br>Party V2</h1>
+      <h1>HOUSE V2</h1>
       <div class="hosted-by">Hosted by Krish & James</div>
     </div>
   </div>
