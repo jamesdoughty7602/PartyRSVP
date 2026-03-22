@@ -1144,10 +1144,10 @@ MAIN_HTML = r"""<!DOCTYPE html>
       const myName = getName();
 
       pills.innerHTML = '';
-      if (data.going_count > 0) pills.innerHTML += '<span class="count-pill going-pill">' + data.going_count + ' going</span>';
-      if (data.maybe_count > 0) pills.innerHTML += '<span class="count-pill maybe-pill">' + data.maybe_count + ' maybe</span>';
-      if (data.cant_go_count > 0) pills.innerHTML += '<span class="count-pill cant-pill">' + data.cant_go_count + " can't go</span>";
-      if (data.invited_count > 0) pills.innerHTML += '<span class="count-pill" style="background:#f0eeeb;color:#999">' + data.invited_count + ' invited</span>';
+      if (data.going_count > 0) pills.innerHTML += '<span class="count-pill going-pill" style="cursor:pointer" onclick="document.getElementById(\'section-going\').scrollIntoView({behavior:\'smooth\',block:\'start\'})">' + data.going_count + ' going</span>';
+      if (data.maybe_count > 0) pills.innerHTML += '<span class="count-pill maybe-pill" style="cursor:pointer" onclick="document.getElementById(\'section-maybe\').scrollIntoView({behavior:\'smooth\',block:\'start\'})">' + data.maybe_count + ' maybe</span>';
+      if (data.cant_go_count > 0) pills.innerHTML += '<span class="count-pill cant-pill" style="cursor:pointer" onclick="document.getElementById(\'section-cantgo\').scrollIntoView({behavior:\'smooth\',block:\'start\'})">' + data.cant_go_count + " can't go</span>";
+      if (data.invited_count > 0) pills.innerHTML += '<span class="count-pill" style="background:#f0eeeb;color:#999;cursor:pointer" onclick="document.getElementById(\'section-invited\').scrollIntoView({behavior:\'smooth\',block:\'start\'})">' + data.invited_count + ' invited</span>';
 
       if (data.guests.length === 0) {
         container.innerHTML = '<div class="empty-state"><div class="empty-emoji">&#128064;</div><p>No RSVPs yet.<br>Be the first to join!</p></div>';
@@ -1160,20 +1160,20 @@ MAIN_HTML = r"""<!DOCTYPE html>
 
       let html = '';
       if (going.length > 0) {
-        html += '<div class="guest-section-label">Going &#127881;</div>';
+        html += '<div class="guest-section-label" id="section-going">Going &#127881;</div>';
         html += renderGuestList(going, myName);
       }
       if (maybe.length > 0) {
-        html += '<div class="guest-section-label">Maybe &#129300;</div>';
+        html += '<div class="guest-section-label" id="section-maybe">Maybe &#129300;</div>';
         html += renderGuestList(maybe, myName);
       }
       if (cant.length > 0) {
-        html += '<div class="guest-section-label">Can\'t Go</div>';
+        html += '<div class="guest-section-label" id="section-cantgo">Can\'t Go</div>';
         html += renderGuestList(cant, myName);
       }
       const invited = data.invited || [];
       if (invited.length > 0) {
-        html += '<div class="guest-section-label" style="color:#bbb">Invited &#9993;&#65039;</div>';
+        html += '<div class="guest-section-label" id="section-invited" style="color:#bbb">Invited &#9993;&#65039;</div>';
         html += '<ul class="guest-list">' + invited.map(g => {
           const color = getAvatarColor(g.name);
           const isMe = myName && g.name.toLowerCase() === myName.toLowerCase();
