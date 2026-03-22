@@ -51,6 +51,11 @@ def get_db():
         approved INTEGER NOT NULL DEFAULT 0,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )""")
+    conn.execute("""CREATE TABLE IF NOT EXISTS announcements (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        message TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )""")
     try:
         conn.execute("ALTER TABLE plus_ones ADD COLUMN phone TEXT DEFAULT ''")
     except sqlite3.OperationalError:
@@ -234,6 +239,11 @@ class Handler(BaseHTTPRequestHandler):
             rows = conn.execute("SELECT id, name, phone, approved FROM plus_ones WHERE added_by = ? COLLATE NOCASE ORDER BY created_at DESC", (name,)).fetchall()
             conn.close()
             json_response(self, 200, {"plus_ones": [{"id": r["id"], "name": r["name"], "phone": r["phone"] or "", "approved": r["approved"] == 1, "denied": r["approved"] == -1} for r in rows]})
+        elif self.path == "/api/announcements":
+            conn = get_db()
+            rows = [dict(r) for r in conn.execute("SELECT id, message, created_at FROM announcements ORDER BY created_at DESC").fetchall()]
+            conn.close()
+            json_response(self, 200, {"announcements": rows})
         elif self.path == "/admin":
             if check_admin_session(self.headers.get("Cookie")):
                 html_response(self, 200, ADMIN_HTML)
@@ -247,8 +257,9 @@ class Handler(BaseHTTPRequestHandler):
             guest_list = [dict(r) for r in conn.execute("SELECT id, name, invite_token, instagram, facebook FROM guest_list ORDER BY name COLLATE NOCASE").fetchall()]
             rsvps = [dict(r) for r in conn.execute("SELECT id, name, status, approved, instagram, facebook, phone, profile_pic, created_at, updated_at FROM rsvps ORDER BY created_at DESC").fetchall()]
             plus_ones = [dict(r) for r in conn.execute("SELECT id, added_by, name, phone, invite_token, approved, created_at FROM plus_ones ORDER BY added_by COLLATE NOCASE, created_at DESC").fetchall()]
+            announcements = [dict(r) for r in conn.execute("SELECT id, message, created_at FROM announcements ORDER BY created_at DESC").fetchall()]
             conn.close()
-            json_response(self, 200, {"guest_list": guest_list, "rsvps": rsvps, "plus_ones": plus_ones})
+            json_response(self, 200, {"guest_list": guest_list, "rsvps": rsvps, "plus_ones": plus_ones, "announcements": announcements})
         else:
             self.send_response(404)
             self.end_headers()
@@ -587,6 +598,40 @@ class Handler(BaseHTTPRequestHandler):
                 print(f"  -> {r['name']}: {r['phone']}")
             json_response(self, 200, {"ok": True, "sent_to": len(recipients), "recipients": [{"name": r["name"], "phone": r["phone"]} for r in recipients]})
 
+        elif self.path == "/api/admin/announcement":
+            if not check_admin_session(self.headers.get("Cookie")):
+                json_response(self, 401, {"error": "Unauthorized"})
+                return
+            body = read_body(self)
+            message = body.get("message", "").strip()
+            if not message:
+                json_response(self, 400, {"error": "Message is required"})
+                return
+            conn = get_db()
+            conn.execute("INSERT INTO announcements (message) VALUES (?)", (message,))
+            conn.commit()
+            conn.close()
+            json_response(self, 200, {"ok": True})
+
+        else:
+            self.send_response(404)
+            self.end_headers()
+
+    def do_DELETE(self):
+        if self.path == "/api/admin/announcement":
+            if not check_admin_session(self.headers.get("Cookie")):
+                json_response(self, 401, {"error": "Unauthorized"})
+                return
+            body = read_body(self)
+            ann_id = body.get("id")
+            if not ann_id:
+                json_response(self, 400, {"error": "ID is required"})
+                return
+            conn = get_db()
+            conn.execute("DELETE FROM announcements WHERE id = ?", (ann_id,))
+            conn.commit()
+            conn.close()
+            json_response(self, 200, {"ok": True})
         else:
             self.send_response(404)
             self.end_headers()
@@ -943,6 +988,11 @@ MAIN_HTML = r"""<!DOCTYPE html>
         <input type="url" class="social-input" id="fb-input" placeholder="https://facebook.com/yourprofile" autocomplete="off">
       </div>
       <button class="save-socials-btn" onclick="saveSocials()">Save Socials</button>
+      </div>
+      <div id="announcements-section" style="display:none">
+        <hr style="border:none;border-top:1px solid #eee;margin:24px 0">
+        <h3 style="font-size:18px;font-weight:700;margin-bottom:12px">&#128203; Details</h3>
+        <div id="announcements-list"></div>
       </div>
     </form>
   </div>
@@ -1487,12 +1537,36 @@ MAIN_HTML = r"""<!DOCTYPE html>
     if (e.key === 'Enter') { e.preventDefault(); addPlusOne(); }
   });
 
+  async function loadAnnouncements() {
+    try {
+      const res = await fetch('/api/announcements');
+      const data = await res.json();
+      const list = document.getElementById('announcements-list');
+      const section = document.getElementById('announcements-section');
+      if (data.announcements && data.announcements.length > 0) {
+        section.style.display = '';
+        list.innerHTML = data.announcements.map(a => {
+          const d = new Date(a.created_at);
+          const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+          const h = d.getHours(); const m = d.getMinutes();
+          const ampm = h >= 12 ? 'PM' : 'AM';
+          const h12 = h % 12 || 12;
+          const timeStr = months[d.getMonth()] + ' ' + d.getDate() + ' at ' + h12 + ':' + (m < 10 ? '0' : '') + m + ' ' + ampm;
+          return '<div style="background:#f9f8f6;border-radius:12px;padding:14px 16px;margin-bottom:10px"><div style="font-size:14px;line-height:1.5">' + escapeHtml(a.message) + '</div><div style="font-size:11px;color:#999;margin-top:6px">' + timeStr + '</div></div>';
+        }).join('');
+      } else {
+        section.style.display = 'none';
+      }
+    } catch (e) { console.error('Failed to load announcements', e); }
+  }
+
   // On load
   const savedName = localStorage.getItem(STORAGE_KEY);
   if (savedName) {
     document.getElementById('name-input').value = savedName;
     refreshMyStatus();
   }
+  loadAnnouncements();
 </script>
 </body>
 </html>
@@ -1690,6 +1764,16 @@ ADMIN_HTML = r"""<!DOCTYPE html>
       <div class="chip-list" id="guest-chips"></div>
     </div>
 
+    <div class="card">
+      <h3>&#128203; Party Updates</h3>
+      <p style="color:#999;font-size:13px;margin-bottom:16px">Post updates that all guests will see on their RSVP page</p>
+      <div style="display:flex;gap:8px;margin-bottom:16px">
+        <textarea id="announcement-input" placeholder="e.g. It's raining — bring jackets! &#9748;&#65039;" style="flex:1;padding:10px 14px;font-size:14px;border:1px solid #e8e6e3;border-radius:12px;resize:vertical;min-height:60px;font-family:inherit"></textarea>
+        <button onclick="postAnnouncement()" style="padding:10px 20px;background:#222;color:#fff;border:none;border-radius:12px;font-weight:600;cursor:pointer;white-space:nowrap;align-self:flex-start">Post</button>
+      </div>
+      <div id="admin-announcements-list"></div>
+    </div>
+
     <!-- Plus Ones -->
     <div class="card" id="plusones-card">
       <h2>&#128101; Plus Ones</h2>
@@ -1824,6 +1908,8 @@ ADMIN_HTML = r"""<!DOCTYPE html>
       });
       poArea.innerHTML = html;
     }
+
+    renderAnnouncements();
   }
 
   function statusLabel(s) {
@@ -2160,6 +2246,58 @@ ADMIN_HTML = r"""<!DOCTYPE html>
         loadData();
       }
     } catch (e) { showToast('Failed to save'); }
+  }
+
+  async function postAnnouncement() {
+    const input = document.getElementById('announcement-input');
+    const message = input.value.trim();
+    if (!message) return;
+    try {
+      const res = await fetch('/api/admin/announcement', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message })
+      });
+      if (res.ok) {
+        input.value = '';
+        showToast('Update posted');
+        loadData();
+      } else { showToast('Failed to post'); }
+    } catch (e) { showToast('Something went wrong'); }
+  }
+
+  async function deleteAnnouncement(id) {
+    if (!confirm('Delete this update?')) return;
+    try {
+      const res = await fetch('/api/admin/announcement', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id })
+      });
+      if (res.ok) {
+        showToast('Update deleted');
+        loadData();
+      }
+    } catch (e) { showToast('Something went wrong'); }
+  }
+
+  function renderAnnouncements() {
+    if (!_adminData) return;
+    const list = document.getElementById('admin-announcements-list');
+    const anns = _adminData.announcements || [];
+    if (anns.length === 0) {
+      list.innerHTML = '<p style="color:#bbb;font-size:13px">No updates posted yet</p>';
+      return;
+    }
+    list.innerHTML = anns.map(a => {
+      const d = new Date(a.created_at);
+      const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      const h = d.getHours(); const m = d.getMinutes();
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      const h12 = h % 12 || 12;
+      const timeStr = months[d.getMonth()] + ' ' + d.getDate() + ' at ' + h12 + ':' + (m < 10 ? '0' : '') + m + ' ' + ampm;
+      return '<div style="background:#f9f8f6;border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:flex-start;gap:10px"><div style="flex:1"><div style="font-size:14px;line-height:1.5">' + esc(a.message) + '</div><div style="font-size:11px;color:#999;margin-top:4px">' + timeStr + '</div></div><button onclick="deleteAnnouncement(' + a.id + ')" style="background:none;border:none;color:#c0392b;font-size:18px;cursor:pointer;padding:0 4px;font-weight:700;flex-shrink:0" title="Delete">&times;</button></div>';
+    }).join('');
   }
 
   // Enter key in add-name input

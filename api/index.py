@@ -92,6 +92,11 @@ def init_db():
         conn.commit()
     except Exception:
         conn.rollback()
+    cur.execute("""CREATE TABLE IF NOT EXISTS announcements (
+        id SERIAL PRIMARY KEY,
+        message TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )""")
     conn.commit()
     # Backfill invite tokens for guests that don't have one
     cur.execute("SELECT id FROM guest_list WHERE invite_token IS NULL")
@@ -260,6 +265,8 @@ def api_admin_data():
     rsvps = cur.fetchall()
     cur.execute("SELECT id, added_by, name, phone, invite_token, approved, created_at FROM plus_ones ORDER BY LOWER(added_by), created_at DESC")
     plus_ones = cur.fetchall()
+    cur.execute("SELECT id, message, created_at FROM announcements ORDER BY created_at DESC")
+    announcements = cur.fetchall()
     conn.close()
     # Convert timestamps to strings
     for r in rsvps:
@@ -267,7 +274,9 @@ def api_admin_data():
         r["updated_at"] = str(r["updated_at"]) if r["updated_at"] else ""
     for p in plus_ones:
         p["created_at"] = str(p["created_at"]) if p["created_at"] else ""
-    return jsonify({"guest_list": guest_list, "rsvps": rsvps, "plus_ones": plus_ones})
+    for a in announcements:
+        a["created_at"] = str(a["created_at"]) if a["created_at"] else ""
+    return jsonify({"guest_list": guest_list, "rsvps": rsvps, "plus_ones": plus_ones, "announcements": announcements})
 
 
 @app.route("/api/rsvp", methods=["POST"])
@@ -632,6 +641,50 @@ def api_admin_delete_plus_one():
     return jsonify({"ok": True})
 
 
+@app.route("/api/announcements")
+def api_announcements():
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT id, message, created_at FROM announcements ORDER BY created_at DESC")
+    rows = cur.fetchall()
+    conn.close()
+    for r in rows:
+        r["created_at"] = str(r["created_at"]) if r["created_at"] else ""
+    return jsonify({"announcements": rows})
+
+
+@app.route("/api/admin/announcement", methods=["POST"])
+def api_admin_post_announcement():
+    if not check_admin():
+        return jsonify({"error": "Unauthorized"}), 401
+    body = request.get_json(force=True)
+    message = body.get("message", "").strip()
+    if not message:
+        return jsonify({"error": "Message is required"}), 400
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("INSERT INTO announcements (message) VALUES (%s)", (message,))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/admin/announcement", methods=["DELETE"])
+def api_admin_delete_announcement():
+    if not check_admin():
+        return jsonify({"error": "Unauthorized"}), 401
+    body = request.get_json(force=True)
+    ann_id = body.get("id")
+    if not ann_id:
+        return jsonify({"error": "ID is required"}), 400
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM announcements WHERE id = %s", (ann_id,))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+
 # ─── HTML Templates ──────────────────────────────────────────────────────────
 
 MAIN_HTML = r"""<!DOCTYPE html>
@@ -980,6 +1033,11 @@ MAIN_HTML = r"""<!DOCTYPE html>
         <input type="url" class="social-input" id="fb-input" placeholder="https://facebook.com/yourprofile" autocomplete="off">
       </div>
       <button class="save-socials-btn" onclick="saveSocials()">Save Socials</button>
+      </div>
+      <div id="announcements-section" style="display:none">
+        <hr style="border:none;border-top:1px solid #eee;margin:24px 0">
+        <h3 style="font-size:18px;font-weight:700;margin-bottom:12px">&#128203; Details</h3>
+        <div id="announcements-list"></div>
       </div>
     </form>
   </div>
@@ -1513,11 +1571,35 @@ MAIN_HTML = r"""<!DOCTYPE html>
     if (e.key === 'Enter') { e.preventDefault(); addPlusOne(); }
   });
 
+  async function loadAnnouncements() {
+    try {
+      const res = await fetch('/api/announcements');
+      const data = await res.json();
+      const list = document.getElementById('announcements-list');
+      const section = document.getElementById('announcements-section');
+      if (data.announcements && data.announcements.length > 0) {
+        section.style.display = '';
+        list.innerHTML = data.announcements.map(a => {
+          const d = new Date(a.created_at);
+          const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+          const h = d.getHours(); const m = d.getMinutes();
+          const ampm = h >= 12 ? 'PM' : 'AM';
+          const h12 = h % 12 || 12;
+          const timeStr = months[d.getMonth()] + ' ' + d.getDate() + ' at ' + h12 + ':' + (m < 10 ? '0' : '') + m + ' ' + ampm;
+          return '<div style="background:#f9f8f6;border-radius:12px;padding:14px 16px;margin-bottom:10px"><div style="font-size:14px;line-height:1.5">' + escapeHtml(a.message) + '</div><div style="font-size:11px;color:#999;margin-top:6px">' + timeStr + '</div></div>';
+        }).join('');
+      } else {
+        section.style.display = 'none';
+      }
+    } catch (e) { console.error('Failed to load announcements', e); }
+  }
+
   const savedName = getName();
   if (savedName) {
     document.getElementById('name-input').value = savedName;
     refreshMyStatus();
   }
+  loadAnnouncements();
 </script>
 </body>
 </html>
@@ -1714,6 +1796,16 @@ ADMIN_HTML = r"""<!DOCTYPE html>
       <div class="chip-list" id="guest-chips"></div>
     </div>
 
+    <div class="card">
+      <h3>&#128203; Party Updates</h3>
+      <p style="color:#999;font-size:13px;margin-bottom:16px">Post updates that all guests will see on their RSVP page</p>
+      <div style="display:flex;gap:8px;margin-bottom:16px">
+        <textarea id="announcement-input" placeholder="e.g. It's raining — bring jackets! &#9748;&#65039;" style="flex:1;padding:10px 14px;font-size:14px;border:1px solid #e8e6e3;border-radius:12px;resize:vertical;min-height:60px;font-family:inherit"></textarea>
+        <button onclick="postAnnouncement()" style="padding:10px 20px;background:#222;color:#fff;border:none;border-radius:12px;font-weight:600;cursor:pointer;white-space:nowrap;align-self:flex-start">Post</button>
+      </div>
+      <div id="admin-announcements-list"></div>
+    </div>
+
     <div class="card" id="plusones-card">
       <h2>&#128101; Plus Ones</h2>
       <div id="plusones-area"></div>
@@ -1844,6 +1936,8 @@ ADMIN_HTML = r"""<!DOCTYPE html>
       });
       poArea.innerHTML = html;
     }
+
+    renderAnnouncements();
   }
 
   function statusLabel(s) {
@@ -2179,6 +2273,58 @@ ADMIN_HTML = r"""<!DOCTYPE html>
         loadData();
       }
     } catch (e) { showToast('Failed to save'); }
+  }
+
+  async function postAnnouncement() {
+    const input = document.getElementById('announcement-input');
+    const message = input.value.trim();
+    if (!message) return;
+    try {
+      const res = await fetch('/api/admin/announcement', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message })
+      });
+      if (res.ok) {
+        input.value = '';
+        showToast('Update posted');
+        loadData();
+      } else { showToast('Failed to post'); }
+    } catch (e) { showToast('Something went wrong'); }
+  }
+
+  async function deleteAnnouncement(id) {
+    if (!confirm('Delete this update?')) return;
+    try {
+      const res = await fetch('/api/admin/announcement', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id })
+      });
+      if (res.ok) {
+        showToast('Update deleted');
+        loadData();
+      }
+    } catch (e) { showToast('Something went wrong'); }
+  }
+
+  function renderAnnouncements() {
+    if (!_adminData) return;
+    const list = document.getElementById('admin-announcements-list');
+    const anns = _adminData.announcements || [];
+    if (anns.length === 0) {
+      list.innerHTML = '<p style="color:#bbb;font-size:13px">No updates posted yet</p>';
+      return;
+    }
+    list.innerHTML = anns.map(a => {
+      const d = new Date(a.created_at);
+      const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      const h = d.getHours(); const m = d.getMinutes();
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      const h12 = h % 12 || 12;
+      const timeStr = months[d.getMonth()] + ' ' + d.getDate() + ' at ' + h12 + ':' + (m < 10 ? '0' : '') + m + ' ' + ampm;
+      return '<div style="background:#f9f8f6;border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:flex-start;gap:10px"><div style="flex:1"><div style="font-size:14px;line-height:1.5">' + esc(a.message) + '</div><div style="font-size:11px;color:#999;margin-top:4px">' + timeStr + '</div></div><button onclick="deleteAnnouncement(' + a.id + ')" style="background:none;border:none;color:#c0392b;font-size:18px;cursor:pointer;padding:0 4px;font-weight:700;flex-shrink:0" title="Delete">&times;</button></div>';
+    }).join('');
   }
 
   document.getElementById('add-name').addEventListener('keydown', e => {
