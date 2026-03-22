@@ -1774,7 +1774,7 @@ ADMIN_HTML = r"""<!DOCTYPE html>
       <h3>&#128203; Party Updates</h3>
       <p style="color:#999;font-size:13px;margin-bottom:16px">Post updates that all guests will see on their RSVP page</p>
       <div style="display:flex;gap:8px;margin-bottom:16px">
-        <textarea id="announcement-input" placeholder="e.g. It's raining — bring jackets! &#9748;&#65039;" style="flex:1;padding:10px 14px;font-size:14px;border:1px solid #e8e6e3;border-radius:12px;resize:vertical;min-height:60px;font-family:inherit"></textarea>
+        <textarea id="announcement-input" placeholder="e.g. It's raining — bring jackets! &#9748;&#65039;" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'" style="flex:1;padding:10px 14px;font-size:14px;border:1px solid #e8e6e3;border-radius:12px;resize:none;min-height:60px;overflow:hidden;font-family:inherit"></textarea>
         <button onclick="postAnnouncement()" style="padding:10px 20px;background:#222;color:#fff;border:none;border-radius:12px;font-weight:600;cursor:pointer;white-space:nowrap;align-self:flex-start">Post</button>
       </div>
       <div id="admin-announcements-list"></div>
