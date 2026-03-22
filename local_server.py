@@ -173,14 +173,22 @@ class Handler(BaseHTTPRequestHandler):
             guests = [{"name": r["name"], "status": r["status"], "instagram": r["instagram"] or "", "facebook": r["facebook"] or "", "profile_pic": r["profile_pic"] or "", "time": r["updated_at"]} for r in rows]
             for p in plus_ones:
                 guests.append({"name": p["name"], "status": "going", "instagram": "", "facebook": "", "profile_pic": "", "time": p["created_at"]})
+            # Get invited guests who haven't RSVP'd yet
+            rsvp_names = set(g["name"].lower() for g in guests)
+            conn2 = get_db()
+            gl_rows = conn2.execute("SELECT name FROM guest_list ORDER BY name").fetchall()
+            conn2.close()
+            invited = [{"name": r["name"], "status": "invited"} for r in gl_rows if r["name"].lower() not in rsvp_names]
             going = [g for g in guests if g["status"] == "going"]
             maybe = [g for g in guests if g["status"] == "maybe"]
             cant = [g for g in guests if g["status"] == "cant_go"]
             data = {
                 "guests": guests,
+                "invited": invited,
                 "going_count": len(going),
                 "maybe_count": len(maybe),
                 "cant_go_count": len(cant),
+                "invited_count": len(invited),
                 "total": len(guests),
             }
             json_response(self, 200, data)
@@ -803,6 +811,9 @@ MAIN_HTML = r"""<!DOCTYPE html>
   .guest-list li:last-child { border-bottom: none; }
 
   .avatar { width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px; color: #fff; flex-shrink: 0; }
+  .avatar-clickable { cursor: pointer; transition: transform 0.3s ease, box-shadow 0.3s ease; }
+  .avatar-clickable:hover { transform: scale(1.1); }
+  .avatar-clickable.expanded { transform: scale(2.5); box-shadow: 0 4px 20px rgba(0,0,0,0.3); z-index: 100; position: relative; }
   .guest-name { flex: 1; }
   .guest-badge { font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 100px; }
   .badge-you { color: #2a5db0; background: #e8f0fe; }
@@ -1094,6 +1105,7 @@ MAIN_HTML = r"""<!DOCTYPE html>
       if (data.going_count > 0) pills.innerHTML += '<span class="count-pill going-pill">' + data.going_count + ' going</span>';
       if (data.maybe_count > 0) pills.innerHTML += '<span class="count-pill maybe-pill">' + data.maybe_count + ' maybe</span>';
       if (data.cant_go_count > 0) pills.innerHTML += '<span class="count-pill cant-pill">' + data.cant_go_count + " can't go</span>";
+      if (data.invited_count > 0) pills.innerHTML += '<span class="count-pill" style="background:#f0eeeb;color:#999">' + data.invited_count + ' invited</span>';
 
       if (data.guests.length === 0) {
         container.innerHTML = '<div class="empty-state"><div class="empty-emoji">&#128064;</div><p>No RSVPs yet.<br>Be the first to join!</p></div>';
@@ -1116,6 +1128,15 @@ MAIN_HTML = r"""<!DOCTYPE html>
       if (cant.length > 0) {
         html += '<div class="guest-section-label">Can\'t Go</div>';
         html += renderGuestList(cant, myName);
+      }
+      const invited = data.invited || [];
+      if (invited.length > 0) {
+        html += '<div class="guest-section-label" style="color:#bbb">Invited &#9993;&#65039;</div>';
+        html += '<ul class="guest-list">' + invited.map(g => {
+          const color = getAvatarColor(g.name);
+          const isMe = myName && g.name.toLowerCase() === myName.toLowerCase();
+          return '<li style="opacity:0.5"><span class="avatar" style="background:' + color + '">' + escapeHtml(g.name.charAt(0).toUpperCase()) + '</span><span class="guest-name">' + escapeHtml(g.name) + '</span>' + (isMe ? '<span class="guest-badge badge-you">You</span>' : '') + '</li>';
+        }).join('') + '</ul>';
       }
       container.innerHTML = html;
     } catch (e) {
@@ -1143,10 +1164,24 @@ MAIN_HTML = r"""<!DOCTYPE html>
         }
         socials += '</span>';
       }
-      const avatarHtml = g.profile_pic ? '<span class="avatar" style="padding:0;overflow:hidden"><img src="' + g.profile_pic + '" style="width:100%;height:100%;object-fit:cover;border-radius:50%"></span>' : '<span class="avatar" style="background:' + color + '">' + escapeHtml(g.name.charAt(0).toUpperCase()) + '</span>';
+      const avatarHtml = g.profile_pic ? '<span class="avatar avatar-clickable" style="padding:0;overflow:hidden" onclick="expandAvatar(this)"><img src="' + g.profile_pic + '" style="width:100%;height:100%;object-fit:cover;border-radius:50%"></span>' : '<span class="avatar" style="background:' + color + '">' + escapeHtml(g.name.charAt(0).toUpperCase()) + '</span>';
       return '<li>' + avatarHtml + '<span class="guest-name">' + escapeHtml(g.name) + '</span>' + socials + (isMe ? '<span class="guest-badge badge-you">You</span>' : '') + '</li>';
     }).join('') + '</ul>';
   }
+
+  function expandAvatar(el) {
+    if (el.classList.contains('expanded')) {
+      el.classList.remove('expanded');
+    } else {
+      document.querySelectorAll('.avatar-clickable.expanded').forEach(a => a.classList.remove('expanded'));
+      el.classList.add('expanded');
+    }
+  }
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('.avatar-clickable')) {
+      document.querySelectorAll('.avatar-clickable.expanded').forEach(a => a.classList.remove('expanded'));
+    }
+  });
 
   async function handleProfilePhoto(input) {
     if (!input.files || !input.files[0]) return;
