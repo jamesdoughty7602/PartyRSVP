@@ -1821,7 +1821,7 @@ ADMIN_HTML = r"""<!DOCTYPE html>
   .count-pill.going-pill { background: #e8f8ef; color: #1a7a42; }
   .count-pill.maybe-pill { background: #fff8e6; color: #9a7b20; }
   .count-pill.cant-pill { background: #fde8e8; color: #c0392b; }
-  .guest-section-label { font-size: 12px; font-weight: 700; color: #999; text-transform: uppercase; letter-spacing: 0.06em; margin-top: 20px; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid #f0eee9; scroll-margin-top: 60px; }
+  .guest-section-label { font-size: 12px; font-weight: 700; color: #999; text-transform: uppercase; letter-spacing: 0.06em; margin-top: 20px; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid #f0eee9; scroll-margin-top: 20px; }
   .guest-section-label:first-child { margin-top: 0; }
   .guest-list { list-style: none; }
   .guest-list li { padding: 12px 0; border-bottom: 1px solid #f0eee9; display: flex; align-items: center; gap: 14px; font-size: 15px; font-weight: 500; }
