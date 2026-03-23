@@ -944,10 +944,12 @@ MAIN_HTML = r"""<!DOCTYPE html>
   .plusone-remove:hover { opacity: 1; }
 
   .rsvp-buttons { display: flex; gap: 10px; margin-bottom: 8px; }
-  .rsvp-btn { flex: 1; padding: 16px 8px; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 700; border: none; border-radius: 14px; cursor: pointer; transition: transform 0.15s, box-shadow 0.2s; display: flex; align-items: center; justify-content: center; gap: 6px; }
+  .rsvp-btn { flex: 1; padding: 16px 8px; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 700; border: none; border-radius: 14px; cursor: pointer; transition: transform 0.15s, border-color 0.15s, background 0.15s, color 0.15s; display: flex; align-items: center; justify-content: center; gap: 6px; -webkit-tap-highlight-color: transparent; outline: none; }
   .rsvp-btn:active { transform: scale(0.97); }
   .rsvp-btn:disabled { opacity: 0.5; cursor: not-allowed; }
   .rsvp-btn.going, .rsvp-btn.maybe-btn, .rsvp-btn.cant-go { background: #fff; color: #999; border: 2px solid #e8e6e3; }
+  .rsvp-btn:hover:not(.selected) { border-color: #e8e6e3; }
+  .rsvp-btn:focus:not(.selected) { border-color: #e8e6e3; }
   .rsvp-btn.going.selected, .rsvp-btn.going.selected:hover { background: #e8f8ef; color: #1a7a42; border-color: #27ae60; }
   .rsvp-btn.maybe-btn.selected, .rsvp-btn.maybe-btn.selected:hover { background: #fff8e6; color: #9a7b20; border-color: #f1c40f; }
   .rsvp-btn.cant-go.selected, .rsvp-btn.cant-go.selected:hover { background: #fde8e8; color: #c0392b; border-color: #e74c3c; }
@@ -1007,9 +1009,9 @@ MAIN_HTML = r"""<!DOCTYPE html>
   .avatar { width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px; color: #fff; flex-shrink: 0; }
   .avatar-clickable { cursor: pointer; transition: transform 0.2s ease; }
   .avatar-clickable:hover { transform: scale(1.1); }
-  .photo-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:9999; align-items:center; justify-content:center; cursor:pointer; }
+  .photo-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:9999; align-items:center; justify-content:center; cursor:pointer; }
   .photo-overlay.active { display:flex; }
-  .photo-overlay img { width:160px; height:160px; border-radius:50%; object-fit:cover; box-shadow:0 8px 40px rgba(0,0,0,0.4); }
+  .photo-overlay img { width:280px; height:280px; border-radius:50%; object-fit:cover; box-shadow:0 8px 40px rgba(0,0,0,0.5); }
   .guest-name { flex: 1; }
   .guest-badge { font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 100px; }
   .badge-you { color: #2a5db0; background: #e8f0fe; }
@@ -1882,9 +1884,9 @@ ADMIN_HTML = r"""<!DOCTYPE html>
   .avatar { width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px; color: #fff; flex-shrink: 0; }
   .avatar-clickable { cursor: pointer; transition: transform 0.2s ease; }
   .avatar-clickable:hover { transform: scale(1.1); }
-  .photo-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:9999; align-items:center; justify-content:center; cursor:pointer; }
+  .photo-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:9999; align-items:center; justify-content:center; cursor:pointer; }
   .photo-overlay.active { display:flex; }
-  .photo-overlay img { width:160px; height:160px; border-radius:50%; object-fit:cover; box-shadow:0 8px 40px rgba(0,0,0,0.4); }
+  .photo-overlay img { width:280px; height:280px; border-radius:50%; object-fit:cover; box-shadow:0 8px 40px rgba(0,0,0,0.5); }
   .guest-name { flex: 1; }
   .guest-socials { display: flex; gap: 6px; align-items: center; }
   .guest-social-link { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 8px; transition: transform 0.15s; text-decoration: none; }
