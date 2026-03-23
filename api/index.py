@@ -1059,7 +1059,7 @@ MAIN_HTML = r"""<!DOCTYPE html>
     <div class="detail-row">
       <div class="detail-icon">&#128197;</div>
       <div class="detail-text"><span class="detail-label">Date</span><span class="detail-value">Saturday, May 2, 2026</span></div>
-      <div class="detail-action"><a class="detail-link" href="https://www.google.com/calendar/render?action=TEMPLATE&text=HOUSE+PARTY+V2&dates=20260502T083000Z/20260503T000000Z&details=Hosted+by+Krish+%26+James&location=50+Hordern+St%2C+Newtown+NSW" target="_blank" rel="noopener">add to cal</a></div>
+      <div class="detail-action"><a class="detail-link" href="https://www.google.com/calendar/render?action=TEMPLATE&text=HOUSE+PARTY+V2&dates=20260502T083000Z/20260502T150000Z&details=Hosted+by+Krish+%26+James&location=50+Hordern+St%2C+Newtown+NSW" target="_blank" rel="noopener">add to cal</a></div>
     </div>
     <div class="detail-row">
       <div class="detail-icon">&#128336;</div>
