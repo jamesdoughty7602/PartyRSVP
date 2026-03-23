@@ -410,8 +410,8 @@ def api_upload_photo():
         return jsonify({"error": "Name is required"}), 400
     if not photo:
         return jsonify({"error": "Photo is required"}), 400
-    if len(photo) > 500 * 1024:
-        return jsonify({"error": "Photo too large (max 500KB)"}), 400
+    if len(photo) > 2 * 1024 * 1024:
+        return jsonify({"error": "Photo too large (max 2MB)"}), 400
     conn = get_db()
     cur = conn.cursor()
     cur.execute("SELECT id FROM rsvps WHERE LOWER(name) = LOWER(%s)", (name,))
