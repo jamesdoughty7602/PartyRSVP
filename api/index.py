@@ -1417,13 +1417,13 @@ MAIN_HTML = r"""<!DOCTYPE html>
       img.onload = function() {
         const canvas = document.createElement('canvas');
         let w = img.width, h = img.height;
-        const maxDim = 200;
+        const maxDim = 500;
         if (w > h) { if (w > maxDim) { h = h * maxDim / w; w = maxDim; } }
         else { if (h > maxDim) { w = w * maxDim / h; h = maxDim; } }
         canvas.width = w;
         canvas.height = h;
         canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-        const base64 = canvas.toDataURL('image/jpeg', 0.7);
+        const base64 = canvas.toDataURL('image/jpeg', 0.85);
         fetch('/api/upload-photo', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
