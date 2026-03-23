@@ -556,6 +556,30 @@ def api_admin_guest_list():
             conn.rollback()
             conn.close()
             return jsonify({"error": "Name already on list"}), 409
+    elif action == "bulk_add":
+        names = body.get("names", [])
+        if not names:
+            conn.close()
+            return jsonify({"error": "No names provided"}), 400
+        added = 0
+        skipped = 0
+        for n in names:
+            n = n.strip()
+            if not n:
+                continue
+            try:
+                token = secrets.token_urlsafe(12)
+                cur.execute("INSERT INTO guest_list (name, invite_token) VALUES (%s, %s)", (n, token))
+                cur.execute("UPDATE rsvps SET approved = 1 WHERE LOWER(name) = LOWER(%s)", (n,))
+                added += 1
+            except psycopg2.errors.UniqueViolation:
+                conn.rollback()
+                conn = get_db()
+                cur = conn.cursor()
+                skipped += 1
+        conn.commit()
+        conn.close()
+        return jsonify({"ok": True, "added": added, "skipped": skipped}), 201
     elif action == "remove":
         cur.execute("DELETE FROM guest_list WHERE LOWER(name) = LOWER(%s)", (name,))
         cur.execute("DELETE FROM rsvps WHERE LOWER(name) = LOWER(%s)", (name,))
@@ -1942,6 +1966,14 @@ ADMIN_HTML = r"""<!DOCTYPE html>
         <input type="text" id="add-name" placeholder="Add a name to the guest list">
         <button onclick="addGuest()">Add</button>
       </div>
+      <div style="margin:-8px 0 10px 0"><button onclick="document.getElementById('bulk-import-area').classList.toggle('hidden')" style="background:none;border:none;color:#4a90d9;font-size:12px;font-weight:600;cursor:pointer;padding:0;text-decoration:underline">Bulk import names</button></div>
+      <div id="bulk-import-area" class="hidden" style="margin-bottom:16px">
+        <textarea id="bulk-names" placeholder="Paste names here — one per line or comma-separated&#10;&#10;e.g.&#10;John Smith&#10;Jane Doe&#10;Mike Johnson" style="width:100%;min-height:120px;padding:12px;font-size:14px;font-family:inherit;border:2px solid #e8e6e3;border-radius:12px;resize:vertical;box-sizing:border-box"></textarea>
+        <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+          <button onclick="bulkImport()" style="padding:10px 20px;background:#222;color:#fff;border:none;border-radius:10px;font-weight:600;cursor:pointer;font-size:13px">Import All</button>
+          <span id="bulk-status" style="font-size:12px;color:#999"></span>
+        </div>
+      </div>
       <div class="chip-list" id="guest-chips"></div>
     </div>
 
@@ -2098,6 +2130,36 @@ ADMIN_HTML = r"""<!DOCTYPE html>
     return { going: 'Going', maybe: 'Maybe', cant_go: "Can't Go" }[s] || s;
   }
   function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+  async function bulkImport() {
+    const textarea = document.getElementById('bulk-names');
+    const statusEl = document.getElementById('bulk-status');
+    const raw = textarea.value.trim();
+    if (!raw) { showToast('Paste some names first'); return; }
+    // Split by newlines or commas
+    const names = raw.split(/[\n,]+/).map(n => n.trim().replace(/[^a-zA-Z\s\-']/g, '').replace(/\s+/g, ' ').trim()).filter(n => n.length > 0);
+    if (names.length === 0) { showToast('No valid names found'); return; }
+    statusEl.textContent = 'Importing ' + names.length + ' names...';
+    try {
+      const res = await fetch('/api/admin/guest-list', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'bulk_add', names })
+      });
+      const d = await res.json();
+      if (res.ok) {
+        textarea.value = '';
+        let msg = 'Added ' + d.added + ' guests';
+        if (d.skipped > 0) msg += ' (' + d.skipped + ' already on list)';
+        statusEl.textContent = msg;
+        showToast(msg);
+        loadData();
+      } else {
+        statusEl.textContent = d.error || 'Failed';
+        showToast(d.error || 'Failed');
+      }
+    } catch(e) { statusEl.textContent = 'Error'; showToast('Something went wrong'); }
+  }
 
   async function addGuest() {
     const input = document.getElementById('add-name');
