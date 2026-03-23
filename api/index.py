@@ -860,8 +860,10 @@ MAIN_HTML = r"""<!DOCTYPE html>
   .detail-label { font-size: 12px; font-weight: 600; color: #999; text-transform: uppercase; letter-spacing: 0.06em; }
   .detail-value { font-size: 15px; font-weight: 500; color: #1a1a1a; margin-top: 1px; }
   .detail-action { align-self: center; flex-shrink: 0; }
-  .detail-btn { display: inline-flex; align-items: center; gap: 4px; padding: 6px 12px; font-size: 12px; font-weight: 600; color: #555; background: #f5f3f0; border: 1px solid #e8e6e3; border-radius: 8px; cursor: pointer; text-decoration: none; transition: all 0.2s; white-space: nowrap; font-family: inherit; }
-  .detail-btn:hover { background: #eeece8; color: #333; }
+  .detail-link { font-size: 12px; font-weight: 600; color: #4a90d9; text-decoration: none; cursor: pointer; transition: color 0.2s; }
+  .detail-link:hover { color: #2a6cb8; }
+  .detail-pin { font-size: 22px; text-decoration: none; cursor: pointer; transition: transform 0.2s; display: block; }
+  .detail-pin:hover { transform: scale(1.15); }
 
   .byob-msg { font-size: 14px; color: #777; text-align: center; padding: 10px 0 2px; font-weight: 500; letter-spacing: 0.01em; }
 
@@ -1057,7 +1059,7 @@ MAIN_HTML = r"""<!DOCTYPE html>
     <div class="detail-row">
       <div class="detail-icon">&#128197;</div>
       <div class="detail-text"><span class="detail-label">Date</span><span class="detail-value">Saturday, May 2, 2026</span></div>
-      <div class="detail-action"><a class="detail-btn" href="https://www.google.com/calendar/render?action=TEMPLATE&text=HOUSE+PARTY+V2&dates=20260502T083000Z/20260503T000000Z&details=Hosted+by+Krish+%26+James&location=50+Hordern+St%2C+Newtown+NSW" target="_blank" rel="noopener">&#128197; Add to Cal</a></div>
+      <div class="detail-action"><a class="detail-link" href="https://www.google.com/calendar/render?action=TEMPLATE&text=HOUSE+PARTY+V2&dates=20260502T083000Z/20260503T000000Z&details=Hosted+by+Krish+%26+James&location=50+Hordern+St%2C+Newtown+NSW" target="_blank" rel="noopener">add to cal</a></div>
     </div>
     <div class="detail-row">
       <div class="detail-icon">&#128336;</div>
@@ -1066,7 +1068,7 @@ MAIN_HTML = r"""<!DOCTYPE html>
     <div class="detail-row">
       <div class="detail-icon">&#128205;</div>
       <div class="detail-text"><span class="detail-label">Location</span><span class="detail-value">50 Hordern St, Newtown</span></div>
-      <div class="detail-action"><a class="detail-btn" href="https://www.google.com/maps/search/?api=1&query=50+Hordern+St%2C+Newtown+NSW" target="_blank" rel="noopener">&#128506; Map</a></div>
+      <div class="detail-action"><a class="detail-pin" href="https://www.google.com/maps/search/?api=1&query=50+Hordern+St%2C+Newtown+NSW" target="_blank" rel="noopener" title="View on Maps">&#128205;</a></div>
     </div>
     <div class="byob-msg">Drinks will be around, but BYO is the move &#127867;</div>
   </div>
