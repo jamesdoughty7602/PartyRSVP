@@ -265,6 +265,27 @@ def api_plus_ones():
     return jsonify({"plus_ones": [{"id": r["id"], "name": r["name"], "phone": r["phone"] or "", "approved": r["approved"] == 1, "denied": r["approved"] == -1} for r in rows]})
 
 
+@app.route("/api/event.ics")
+def event_ics():
+    ics = (
+        "BEGIN:VCALENDAR\r\n"
+        "VERSION:2.0\r\n"
+        "PRODID:-//HousePartyV2//EN\r\n"
+        "BEGIN:VEVENT\r\n"
+        "DTSTART:20260502T083000Z\r\n"
+        "DTEND:20260502T150000Z\r\n"
+        "SUMMARY:HOUSE PARTY V2\r\n"
+        "DESCRIPTION:Hosted by Krish & James\r\n"
+        "LOCATION:50 Hordern St\\, Newtown NSW\r\n"
+        "END:VEVENT\r\n"
+        "END:VCALENDAR\r\n"
+    )
+    return make_response(ics, 200, {
+        "Content-Type": "text/calendar; charset=utf-8",
+        "Content-Disposition": "attachment; filename=house-party-v2.ics"
+    })
+
+
 @app.route("/")
 def admin():
     if check_admin():
@@ -1059,7 +1080,7 @@ MAIN_HTML = r"""<!DOCTYPE html>
     <div class="detail-row">
       <div class="detail-icon">&#128197;</div>
       <div class="detail-text"><span class="detail-label">Date</span><span class="detail-value">Saturday, May 2, 2026</span></div>
-      <div class="detail-action"><a class="detail-link" href="https://www.google.com/calendar/render?action=TEMPLATE&text=HOUSE+PARTY+V2&dates=20260502T083000Z/20260502T150000Z&details=Hosted+by+Krish+%26+James&location=50+Hordern+St%2C+Newtown+NSW" target="_blank" rel="noopener">add to cal</a></div>
+      <div class="detail-action"><a class="detail-link" href="/api/event.ics" download="house-party-v2.ics">add to cal</a></div>
     </div>
     <div class="detail-row">
       <div class="detail-icon">&#128336;</div>
