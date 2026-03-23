@@ -856,9 +856,17 @@ MAIN_HTML = r"""<!DOCTYPE html>
   .event-details { padding: 20px 24px; border-bottom: 1px solid #eee; display: flex; flex-direction: column; gap: 14px; }
   .detail-row { display: flex; align-items: flex-start; gap: 14px; }
   .detail-icon { width: 40px; height: 40px; border-radius: 12px; background: #f5f3f0; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
-  .detail-text { display: flex; flex-direction: column; justify-content: center; min-height: 40px; }
+  .detail-text { display: flex; flex-direction: column; justify-content: center; min-height: 40px; flex: 1; }
   .detail-label { font-size: 12px; font-weight: 600; color: #999; text-transform: uppercase; letter-spacing: 0.06em; }
   .detail-value { font-size: 15px; font-weight: 500; color: #1a1a1a; margin-top: 1px; }
+  .detail-action { align-self: center; flex-shrink: 0; }
+  .detail-btn { display: inline-flex; align-items: center; gap: 4px; padding: 6px 12px; font-size: 12px; font-weight: 600; color: #555; background: #f5f3f0; border: 1px solid #e8e6e3; border-radius: 8px; cursor: pointer; text-decoration: none; transition: all 0.2s; white-space: nowrap; font-family: inherit; }
+  .detail-btn:hover { background: #eeece8; color: #333; }
+
+  .countdown-bar { display: flex; justify-content: center; gap: 16px; padding: 14px 24px; border-bottom: 1px solid #eee; }
+  .countdown-unit { text-align: center; }
+  .countdown-num { font-size: 22px; font-weight: 700; color: #1a1a1a; font-family: 'DM Serif Display', Georgia, serif; }
+  .countdown-label { font-size: 10px; font-weight: 600; color: #999; text-transform: uppercase; letter-spacing: 0.08em; margin-top: 2px; }
 
   .byob-msg { font-size: 14px; color: #777; text-align: center; padding: 10px 0 2px; font-weight: 500; letter-spacing: 0.01em; }
 
@@ -1053,17 +1061,22 @@ MAIN_HTML = r"""<!DOCTYPE html>
   <div class="event-details">
     <div class="detail-row">
       <div class="detail-icon">&#128197;</div>
-      <div class="detail-text"><span class="detail-label">Date</span><span class="detail-value">Saturday, May 2, 2026</span></div>
-    </div>
-    <div class="detail-row">
-      <div class="detail-icon">&#128336;</div>
-      <div class="detail-text"><span class="detail-label">Time</span><span class="detail-value">6:30 PM onwards</span></div>
+      <div class="detail-text"><span class="detail-label">Date & Time</span><span class="detail-value">Saturday, May 2, 2026 &middot; 6:30 PM onwards</span></div>
+      <div class="detail-action"><a class="detail-btn" href="https://www.google.com/calendar/render?action=TEMPLATE&text=HOUSE+PARTY+V2&dates=20260502T083000Z/20260503T000000Z&details=Hosted+by+Krish+%26+James&location=50+Hordern+St%2C+Newtown+NSW" target="_blank" rel="noopener">&#128197; Add to Cal</a></div>
     </div>
     <div class="detail-row">
       <div class="detail-icon">&#128205;</div>
       <div class="detail-text"><span class="detail-label">Location</span><span class="detail-value">50 Hordern St, Newtown</span></div>
+      <div class="detail-action"><a class="detail-btn" href="https://www.google.com/maps/search/?api=1&query=50+Hordern+St%2C+Newtown+NSW" target="_blank" rel="noopener">&#128506; Map</a></div>
     </div>
     <div class="byob-msg">Drinks will be around, but BYO is the move &#127867;</div>
+  </div>
+
+  <div class="countdown-bar" id="countdown-bar">
+    <div class="countdown-unit"><div class="countdown-num" id="cd-days">--</div><div class="countdown-label">Days</div></div>
+    <div class="countdown-unit"><div class="countdown-num" id="cd-hours">--</div><div class="countdown-label">Hours</div></div>
+    <div class="countdown-unit"><div class="countdown-num" id="cd-mins">--</div><div class="countdown-label">Mins</div></div>
+    <div class="countdown-unit"><div class="countdown-num" id="cd-secs">--</div><div class="countdown-label">Secs</div></div>
   </div>
 
   <div class="tabs">
@@ -1656,7 +1669,7 @@ MAIN_HTML = r"""<!DOCTYPE html>
           const h12 = h % 12 || 12;
           const timeStr = months[d.getMonth()] + ' ' + d.getDate() + ' at ' + h12 + ':' + (m < 10 ? '0' : '') + m + ' ' + ampm;
           const photoHtml = a.photo ? '<div style="margin-top:8px"><img src="' + a.photo + '" style="max-width:100%;border-radius:10px"></div>' : '';
-          return '<div style="background:#f9f8f6;border-radius:12px;padding:14px 16px;margin-bottom:10px">' + photoHtml + '<div style="font-size:14px;line-height:1.5">' + escapeHtml(a.message) + '</div><div style="font-size:11px;color:#999;margin-top:6px">' + timeStr + '</div></div>';
+          return '<div style="background:#fff;border-radius:14px;padding:16px 18px;margin-bottom:12px;border:1px solid #eee;box-shadow:0 2px 8px rgba(0,0,0,0.04)">' + photoHtml + (a.message ? '<div style="font-size:14px;line-height:1.5;color:#333">' + escapeHtml(a.message) + '</div>' : '') + '<div style="font-size:11px;color:#aaa;margin-top:8px">' + timeStr + '</div></div>';
         }).join('');
         // Mark announcements as seen if guest has an invite token
         const token = localStorage.getItem('krish_james_party_v2_token');
@@ -1679,6 +1692,27 @@ MAIN_HTML = r"""<!DOCTYPE html>
     refreshMyStatus();
   }
   loadAnnouncements();
+
+  // Countdown timer — May 2, 2026 6:30 PM AEST (UTC+10)
+  function updateCountdown() {
+    const party = new Date('2026-05-02T18:30:00+10:00').getTime();
+    const now = Date.now();
+    const diff = party - now;
+    if (diff <= 0) {
+      document.getElementById('countdown-bar').innerHTML = '<div style="font-size:16px;font-weight:700;color:#1a1a1a">&#127881; It\'s party time!</div>';
+      return;
+    }
+    const d = Math.floor(diff / 86400000);
+    const h = Math.floor((diff % 86400000) / 3600000);
+    const m = Math.floor((diff % 3600000) / 60000);
+    const s = Math.floor((diff % 60000) / 1000);
+    document.getElementById('cd-days').textContent = d;
+    document.getElementById('cd-hours').textContent = h;
+    document.getElementById('cd-mins').textContent = m;
+    document.getElementById('cd-secs').textContent = s;
+  }
+  updateCountdown();
+  setInterval(updateCountdown, 1000);
 </script>
 </body>
 </html>
@@ -1821,7 +1855,7 @@ ADMIN_HTML = r"""<!DOCTYPE html>
   .count-pill.going-pill { background: #e8f8ef; color: #1a7a42; }
   .count-pill.maybe-pill { background: #fff8e6; color: #9a7b20; }
   .count-pill.cant-pill { background: #fde8e8; color: #c0392b; }
-  .guest-section-label { font-size: 12px; font-weight: 700; color: #999; text-transform: uppercase; letter-spacing: 0.06em; margin-top: 20px; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid #f0eee9; scroll-margin-top: 20px; }
+  .guest-section-label { font-size: 12px; font-weight: 700; color: #999; text-transform: uppercase; letter-spacing: 0.06em; margin-top: 20px; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid #f0eee9; scroll-margin-top: 80px; }
   .guest-section-label:first-child { margin-top: 0; }
   .guest-list { list-style: none; }
   .guest-list li { padding: 12px 0; border-bottom: 1px solid #f0eee9; display: flex; align-items: center; gap: 14px; font-size: 15px; font-weight: 500; }
