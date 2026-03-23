@@ -1009,9 +1009,13 @@ MAIN_HTML = r"""<!DOCTYPE html>
   .avatar { width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px; color: #fff; flex-shrink: 0; }
   .avatar-clickable { cursor: pointer; transition: transform 0.2s ease; }
   .avatar-clickable:hover { transform: scale(1.1); }
-  .photo-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:9999; align-items:center; justify-content:center; cursor:pointer; }
+  .photo-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0); z-index:9999; align-items:center; justify-content:center; cursor:pointer; transition: background 0.25s ease; }
   .photo-overlay.active { display:flex; }
-  .photo-overlay img { width:280px; height:280px; border-radius:50%; object-fit:cover; box-shadow:0 8px 40px rgba(0,0,0,0.5); }
+  .photo-overlay.visible { background:rgba(0,0,0,0.85); }
+  .photo-overlay img { width:280px; height:280px; border-radius:50%; object-fit:cover; box-shadow:0 8px 40px rgba(0,0,0,0.5); transform: scale(0.3); opacity: 0; transition: transform 0.3s cubic-bezier(0.175,0.885,0.32,1.275), opacity 0.25s ease; }
+  .photo-overlay.visible img { transform: scale(1); opacity: 1; }
+  .photo-overlay.closing img { transform: scale(0.3); opacity: 0; }
+  .photo-overlay.closing { background:rgba(0,0,0,0); }
   .guest-name { flex: 1; }
   .guest-badge { font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 100px; }
   .badge-you { color: #2a5db0; background: #e8f0fe; }
@@ -1387,12 +1391,18 @@ MAIN_HTML = r"""<!DOCTYPE html>
       overlay = document.createElement('div');
       overlay.id = 'photo-overlay';
       overlay.className = 'photo-overlay';
-      overlay.onclick = function() { overlay.classList.remove('active'); };
+      overlay.onclick = function() {
+        overlay.classList.add('closing');
+        overlay.classList.remove('visible');
+        setTimeout(function() { overlay.classList.remove('active', 'closing'); }, 300);
+      };
       overlay.innerHTML = '<img>';
       document.body.appendChild(overlay);
     }
     overlay.querySelector('img').src = img.src;
+    overlay.classList.remove('closing');
     overlay.classList.add('active');
+    requestAnimationFrame(function() { requestAnimationFrame(function() { overlay.classList.add('visible'); }); });
   }
 
   async function handleProfilePhoto(input) {
@@ -1884,9 +1894,13 @@ ADMIN_HTML = r"""<!DOCTYPE html>
   .avatar { width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px; color: #fff; flex-shrink: 0; }
   .avatar-clickable { cursor: pointer; transition: transform 0.2s ease; }
   .avatar-clickable:hover { transform: scale(1.1); }
-  .photo-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:9999; align-items:center; justify-content:center; cursor:pointer; }
+  .photo-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0); z-index:9999; align-items:center; justify-content:center; cursor:pointer; transition: background 0.25s ease; }
   .photo-overlay.active { display:flex; }
-  .photo-overlay img { width:280px; height:280px; border-radius:50%; object-fit:cover; box-shadow:0 8px 40px rgba(0,0,0,0.5); }
+  .photo-overlay.visible { background:rgba(0,0,0,0.85); }
+  .photo-overlay img { width:280px; height:280px; border-radius:50%; object-fit:cover; box-shadow:0 8px 40px rgba(0,0,0,0.5); transform: scale(0.3); opacity: 0; transition: transform 0.3s cubic-bezier(0.175,0.885,0.32,1.275), opacity 0.25s ease; }
+  .photo-overlay.visible img { transform: scale(1); opacity: 1; }
+  .photo-overlay.closing img { transform: scale(0.3); opacity: 0; }
+  .photo-overlay.closing { background:rgba(0,0,0,0); }
   .guest-name { flex: 1; }
   .guest-socials { display: flex; gap: 6px; align-items: center; }
   .guest-social-link { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 8px; transition: transform 0.15s; text-decoration: none; }
@@ -2283,12 +2297,18 @@ ADMIN_HTML = r"""<!DOCTYPE html>
       overlay = document.createElement('div');
       overlay.id = 'photo-overlay';
       overlay.className = 'photo-overlay';
-      overlay.onclick = function() { overlay.classList.remove('active'); };
+      overlay.onclick = function() {
+        overlay.classList.add('closing');
+        overlay.classList.remove('visible');
+        setTimeout(function() { overlay.classList.remove('active', 'closing'); }, 300);
+      };
       overlay.innerHTML = '<img>';
       document.body.appendChild(overlay);
     }
     overlay.querySelector('img').src = img.src;
+    overlay.classList.remove('closing');
     overlay.classList.add('active');
+    requestAnimationFrame(function() { requestAnimationFrame(function() { overlay.classList.add('visible'); }); });
   }
 
   async function renderAdminGuestList() {
