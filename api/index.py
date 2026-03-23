@@ -1058,6 +1058,9 @@ MAIN_HTML = r"""<!DOCTYPE html>
     100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(0.3); }
   }
 
+  .spinner { width:28px; height:28px; border:3px solid #e8e6e3; border-top-color:#999; border-radius:50%; animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
   @media (max-width: 480px) {
     .page-wrapper { box-shadow: none; }
     .hero { height: 240px; }
@@ -1294,11 +1297,14 @@ MAIN_HTML = r"""<!DOCTYPE html>
   }
 
   async function loadGuests() {
+    const container = document.getElementById('guest-list-container');
+    if (!container.innerHTML.trim() || container.innerHTML.includes('empty-state')) {
+      container.innerHTML = '<div style="text-align:center;padding:40px 0;color:#bbb"><div class="spinner" style="margin:0 auto 12px"></div>Loading guest list...</div>';
+    }
     try {
       const res = await fetch('/api/rsvps');
       const data = await res.json();
       const pills = document.getElementById('count-pills');
-      const container = document.getElementById('guest-list-container');
       const myName = getName();
 
       pills.innerHTML = '';
