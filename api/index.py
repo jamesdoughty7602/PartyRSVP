@@ -1003,9 +1003,11 @@ MAIN_HTML = r"""<!DOCTYPE html>
   .guest-list li:last-child { border-bottom: none; }
 
   .avatar { width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px; color: #fff; flex-shrink: 0; }
-  .avatar-clickable { cursor: pointer; transition: transform 0.3s ease, box-shadow 0.3s ease; }
+  .avatar-clickable { cursor: pointer; transition: transform 0.2s ease; }
   .avatar-clickable:hover { transform: scale(1.1); }
-  .avatar-clickable.expanded { transform: scale(2.5); box-shadow: 0 4px 20px rgba(0,0,0,0.3); z-index: 100; position: relative; }
+  .photo-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:9999; align-items:center; justify-content:center; cursor:pointer; }
+  .photo-overlay.active { display:flex; }
+  .photo-overlay img { width:160px; height:160px; border-radius:50%; object-fit:cover; box-shadow:0 8px 40px rgba(0,0,0,0.4); }
   .guest-name { flex: 1; }
   .guest-badge { font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 100px; }
   .badge-you { color: #2a5db0; background: #e8f0fe; }
@@ -1062,7 +1064,8 @@ MAIN_HTML = r"""<!DOCTYPE html>
     .hero h1 { font-size: 28px; }
     .hero-emoji { font-size: 48px; }
     .panel { padding: 20px 18px; }
-    .rsvp-buttons { flex-direction: column; gap: 10px; }
+    .rsvp-buttons { flex-direction: row; gap: 8px; }
+    .rsvp-buttons .rsvp-btn { flex: 1; padding: 14px 8px; font-size: 14px; }
   }
 </style>
 </head>
@@ -1234,7 +1237,7 @@ MAIN_HTML = r"""<!DOCTYPE html>
     if (!name) return;
     const nameGroup = document.getElementById('name-group');
     const cameraSvg = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>';
-    nameGroup.innerHTML = '<div class="returning-name-row"><div class="profile-photo-upload" id="profile-photo-circle" onclick="document.getElementById(\'profile-photo-input\').click()">' + cameraSvg + '</div><div class="returning-name">' + escapeHtml(name) + '</div></div><input type="file" id="profile-photo-input" accept="image/*" capture style="display:none" onchange="handleProfilePhoto(this)">';
+    nameGroup.innerHTML = '<div class="returning-name-row"><div class="profile-photo-upload" id="profile-photo-circle" onclick="document.getElementById(\'profile-photo-input\').click()">' + cameraSvg + '</div><div class="returning-name">' + escapeHtml(name) + '</div></div><input type="file" id="profile-photo-input" accept="image/*" style="display:none" onchange="handleProfilePhoto(this)">';
     const hidden = document.createElement('input');
     hidden.type = 'hidden';
     hidden.id = 'name-input';
@@ -1367,18 +1370,20 @@ MAIN_HTML = r"""<!DOCTYPE html>
   }
 
   function expandAvatar(el) {
-    if (el.classList.contains('expanded')) {
-      el.classList.remove('expanded');
-    } else {
-      document.querySelectorAll('.avatar-clickable.expanded').forEach(a => a.classList.remove('expanded'));
-      el.classList.add('expanded');
+    const img = el.querySelector('img');
+    if (!img) return;
+    let overlay = document.getElementById('photo-overlay');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'photo-overlay';
+      overlay.className = 'photo-overlay';
+      overlay.onclick = function() { overlay.classList.remove('active'); };
+      overlay.innerHTML = '<img>';
+      document.body.appendChild(overlay);
     }
+    overlay.querySelector('img').src = img.src;
+    overlay.classList.add('active');
   }
-  document.addEventListener('click', function(e) {
-    if (!e.target.closest('.avatar-clickable')) {
-      document.querySelectorAll('.avatar-clickable.expanded').forEach(a => a.classList.remove('expanded'));
-    }
-  });
 
   async function handleProfilePhoto(input) {
     if (!input.files || !input.files[0]) return;
@@ -1867,9 +1872,11 @@ ADMIN_HTML = r"""<!DOCTYPE html>
   .guest-list li { padding: 12px 0; border-bottom: 1px solid #f0eee9; display: flex; align-items: center; gap: 14px; font-size: 15px; font-weight: 500; }
   .guest-list li:last-child { border-bottom: none; }
   .avatar { width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px; color: #fff; flex-shrink: 0; }
-  .avatar-clickable { cursor: pointer; transition: transform 0.3s ease, box-shadow 0.3s ease; }
+  .avatar-clickable { cursor: pointer; transition: transform 0.2s ease; }
   .avatar-clickable:hover { transform: scale(1.1); }
-  .avatar-clickable.expanded { transform: scale(2.5); box-shadow: 0 4px 20px rgba(0,0,0,0.3); z-index: 100; position: relative; }
+  .photo-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:9999; align-items:center; justify-content:center; cursor:pointer; }
+  .photo-overlay.active { display:flex; }
+  .photo-overlay img { width:160px; height:160px; border-radius:50%; object-fit:cover; box-shadow:0 8px 40px rgba(0,0,0,0.4); }
   .guest-name { flex: 1; }
   .guest-socials { display: flex; gap: 6px; align-items: center; }
   .guest-social-link { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 8px; transition: transform 0.15s; text-decoration: none; }
@@ -2259,18 +2266,20 @@ ADMIN_HTML = r"""<!DOCTYPE html>
   }
 
   function expandAvatar(el) {
-    if (el.classList.contains('expanded')) {
-      el.classList.remove('expanded');
-    } else {
-      document.querySelectorAll('.avatar-clickable.expanded').forEach(a => a.classList.remove('expanded'));
-      el.classList.add('expanded');
+    const img = el.querySelector('img');
+    if (!img) return;
+    let overlay = document.getElementById('photo-overlay');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'photo-overlay';
+      overlay.className = 'photo-overlay';
+      overlay.onclick = function() { overlay.classList.remove('active'); };
+      overlay.innerHTML = '<img>';
+      document.body.appendChild(overlay);
     }
+    overlay.querySelector('img').src = img.src;
+    overlay.classList.add('active');
   }
-  document.addEventListener('click', function(e) {
-    if (!e.target.closest('.avatar-clickable')) {
-      document.querySelectorAll('.avatar-clickable.expanded').forEach(a => a.classList.remove('expanded'));
-    }
-  });
 
   async function renderAdminGuestList() {
     try {
