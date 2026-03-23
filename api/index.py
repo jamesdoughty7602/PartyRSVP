@@ -945,10 +945,9 @@ MAIN_HTML = r"""<!DOCTYPE html>
   .rsvp-btn:active { transform: scale(0.97); }
   .rsvp-btn:disabled { opacity: 0.5; cursor: not-allowed; }
   .rsvp-btn.going, .rsvp-btn.maybe-btn, .rsvp-btn.cant-go { background: #fff; color: #999; border: 2px solid #e8e6e3; }
-  .rsvp-btn.going:hover:not(:disabled), .rsvp-btn.maybe-btn:hover:not(:disabled), .rsvp-btn.cant-go:hover:not(:disabled) { border-color: #ccc; color: #666; }
-  .rsvp-btn.going.selected { background: #e8f8ef; color: #1a7a42; border-color: #27ae60; }
-  .rsvp-btn.maybe-btn.selected { background: #fff8e6; color: #9a7b20; border-color: #f1c40f; }
-  .rsvp-btn.cant-go.selected { background: #fde8e8; color: #c0392b; border-color: #e74c3c; }
+  .rsvp-btn.going.selected, .rsvp-btn.going.selected:hover { background: #e8f8ef; color: #1a7a42; border-color: #27ae60; }
+  .rsvp-btn.maybe-btn.selected, .rsvp-btn.maybe-btn.selected:hover { background: #fff8e6; color: #9a7b20; border-color: #f1c40f; }
+  .rsvp-btn.cant-go.selected, .rsvp-btn.cant-go.selected:hover { background: #fde8e8; color: #c0392b; border-color: #e74c3c; }
 
   .status-msg { text-align: center; margin-top: 16px; padding: 14px 18px; border-radius: 12px; font-size: 14px; font-weight: 500; line-height: 1.5; }
   .status-msg.approved { background: #e8f8ef; color: #1a7a42; }
