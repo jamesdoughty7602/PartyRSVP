@@ -425,6 +425,22 @@ def api_upload_photo():
     return jsonify({"ok": True})
 
 
+@app.route("/api/admin/remove-photo", methods=["POST"])
+def api_admin_remove_photo():
+    if not check_admin():
+        return jsonify({"error": "Unauthorized"}), 401
+    body = request.get_json(force=True)
+    name = body.get("name", "").strip()
+    if not name:
+        return jsonify({"error": "Name is required"}), 400
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("UPDATE rsvps SET profile_pic = NULL WHERE LOWER(name) = LOWER(%s)", (name,))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+
 @app.route("/api/admin/update-guest-socials", methods=["POST"])
 def api_admin_update_guest_socials():
     if not check_admin():
@@ -2345,9 +2361,21 @@ ADMIN_HTML = r"""<!DOCTYPE html>
         }
         socials += '</span>';
       }
-      const avatarHtml = g.profile_pic ? '<span class="avatar avatar-clickable" style="padding:0;overflow:hidden" onclick="expandAvatar(this)"><img src="' + g.profile_pic + '" style="width:100%;height:100%;object-fit:cover;border-radius:50%"></span>' : '<span class="avatar" style="background:' + color + '">' + escapeHtml(g.name.charAt(0).toUpperCase()) + '</span>';
+      const removePhotoBtn = g.profile_pic ? '<button onclick="event.stopPropagation();removePhoto(\'' + escapeHtml(g.name).replace(/'/g, "\\'") + '\')" style="position:absolute;top:-4px;right:-4px;width:18px;height:18px;border-radius:50%;background:#e74c3c;color:#fff;border:2px solid #fff;font-size:10px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0" title="Remove photo">&times;</button>' : '';
+      const avatarHtml = g.profile_pic ? '<span class="avatar avatar-clickable" style="padding:0;overflow:hidden;position:relative" onclick="expandAvatar(this)"><img src="' + g.profile_pic + '" style="width:100%;height:100%;object-fit:cover;border-radius:50%">' + removePhotoBtn + '</span>' : '<span class="avatar" style="background:' + color + '">' + escapeHtml(g.name.charAt(0).toUpperCase()) + '</span>';
       return '<li>' + avatarHtml + '<span class="guest-name">' + escapeHtml(g.name) + '</span>' + socials + (isMe ? '<span class="guest-badge badge-you">You</span>' : '') + '</li>';
     }).join('') + '</ul>';
+  }
+
+  async function removePhoto(name) {
+    if (!confirm('Remove profile photo for "' + name + '"?')) return;
+    await fetch('/api/admin/remove-photo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name })
+    });
+    showToast('Photo removed for ' + name);
+    renderAdminGuestList();
   }
 
   function expandAvatar(el) {
