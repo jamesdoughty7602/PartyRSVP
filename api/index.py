@@ -1080,7 +1080,7 @@ MAIN_HTML = r"""<!DOCTYPE html>
     <div class="detail-row">
       <div class="detail-icon">&#128197;</div>
       <div class="detail-text"><span class="detail-label">Date</span><span class="detail-value">Saturday, May 2, 2026</span></div>
-      <div class="detail-action"><a class="detail-link" href="/api/event.ics" download="house-party-v2.ics">add to cal</a></div>
+      <div class="detail-action"><a class="detail-link" href="/api/event.ics" download="house-party-v2.ics">add to calendar</a></div>
     </div>
     <div class="detail-row">
       <div class="detail-icon">&#128336;</div>
