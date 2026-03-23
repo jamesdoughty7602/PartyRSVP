@@ -2079,7 +2079,7 @@ ADMIN_HTML = r"""<!DOCTYPE html>
               loadAdminData();
             }
           } else {
-            removeGuest(gName);
+            removeGuest(gName, btn.closest('.chip'));
           }
         };
       });
@@ -2165,6 +2165,8 @@ ADMIN_HTML = r"""<!DOCTYPE html>
     const input = document.getElementById('add-name');
     const name = input.value.trim().replace(/[^a-zA-Z\s\-']/g, '').replace(/\s+/g, ' ').trim();
     if (!name) { input.value = ''; return; }
+    input.value = '';
+    showToast('Added ' + name);
     const res = await fetch('/api/admin/guest-list', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -2172,23 +2174,21 @@ ADMIN_HTML = r"""<!DOCTYPE html>
     });
     const d = await res.json();
     if (res.ok) {
-      input.value = '';
-      showToast('Added ' + name);
       loadData();
     } else {
       showToast(d.error || 'Failed');
     }
   }
 
-  async function removeGuest(name) {
+  async function removeGuest(name, chipEl) {
     if (!confirm('Remove "' + name + '" from the guest list?')) return;
-    await fetch('/api/admin/guest-list', {
+    if (chipEl) chipEl.remove();
+    showToast('Removed ' + name);
+    fetch('/api/admin/guest-list', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'remove', name })
-    });
-    showToast('Removed ' + name);
-    loadData();
+    }).then(() => loadData());
   }
 
   async function approveRsvp(id) {
