@@ -1151,7 +1151,7 @@ MAIN_HTML = r"""<!DOCTYPE html>
     <div id="plusone-area" class="hidden">
       <div class="add-plusone-form" style="flex-wrap:wrap">
         <input type="text" id="plusone-name" placeholder="Friend's full name" autocomplete="off" style="flex:1;min-width:140px">
-        <input type="tel" id="plusone-phone" placeholder="Phone number" autocomplete="off" style="flex:1;min-width:140px;padding:14px 16px;font-family:'DM Sans',sans-serif;font-size:15px;border:2px solid #e8e6e3;border-radius:14px;background:#faf9f7;outline:none">
+        <input type="tel" id="plusone-phone" placeholder="04XX XXX XXX" autocomplete="off" maxlength="14" style="flex:1;min-width:140px;padding:14px 16px;font-family:'DM Sans',sans-serif;font-size:15px;border:2px solid #e8e6e3;border-radius:14px;background:#faf9f7;outline:none">
         <button class="plusone-add-btn" onclick="addPlusOne()">Add</button>
       </div>
       <p style="font-size:12px;color:#aaa;margin:-8px 0 10px 4px">📲 We'll need their number so the host can send them an invite link</p>
@@ -1619,20 +1619,31 @@ MAIN_HTML = r"""<!DOCTYPE html>
     } catch (e) { console.error('Failed to load plus ones', e); }
   }
 
+  function formatAusPhone(raw) {
+    let digits = raw.replace(/[^\d]/g, '');
+    if (digits.startsWith('61')) digits = '0' + digits.slice(2);
+    if (digits.length === 9 && digits.startsWith('4')) digits = '0' + digits;
+    if (digits.length !== 10 || !digits.startsWith('04')) return null;
+    return digits.slice(0,4) + ' ' + digits.slice(4,7) + ' ' + digits.slice(7);
+  }
+
   async function addPlusOne() {
     const name = getName();
     if (!name) return;
     const input = document.getElementById('plusone-name');
     const phoneInput = document.getElementById('plusone-phone');
     const friendName = input.value.trim();
-    const friendPhone = phoneInput.value.trim();
+    const rawPhone = phoneInput.value.trim();
     if (!friendName) { showToast('Please enter their name'); return; }
     const nameParts = friendName.split(/\s+/);
     if (nameParts.length < 2 || nameParts[nameParts.length - 1].length < 2) {
       showToast('Please enter their full name (first & last, at least 2 characters each)');
       return;
     }
-    if (!friendPhone) { showToast('Phone number is required for plus ones'); return; }
+    if (!rawPhone) { showToast('Phone number is required for plus ones'); return; }
+    const friendPhone = formatAusPhone(rawPhone);
+    if (!friendPhone) { showToast('Please enter a valid Australian mobile number (04XX XXX XXX)'); return; }
+    phoneInput.value = friendPhone;
     try {
       const res = await fetch('/api/plus-one', {
         method: 'POST',
