@@ -1966,14 +1966,6 @@ ADMIN_HTML = r"""<!DOCTYPE html>
         <input type="text" id="add-name" placeholder="Add a name to the guest list">
         <button onclick="addGuest()">Add</button>
       </div>
-      <div style="margin:-8px 0 10px 0"><button onclick="document.getElementById('bulk-import-area').classList.toggle('hidden')" style="background:none;border:none;color:#4a90d9;font-size:12px;font-weight:600;cursor:pointer;padding:0;text-decoration:underline">Bulk import names</button></div>
-      <div id="bulk-import-area" class="hidden" style="margin-bottom:16px">
-        <textarea id="bulk-names" placeholder="Paste names here — one per line or comma-separated&#10;&#10;e.g.&#10;John Smith&#10;Jane Doe&#10;Mike Johnson" style="width:100%;min-height:120px;padding:12px;font-size:14px;font-family:inherit;border:2px solid #e8e6e3;border-radius:12px;resize:vertical;box-sizing:border-box"></textarea>
-        <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
-          <button onclick="bulkImport()" style="padding:10px 20px;background:#222;color:#fff;border:none;border-radius:10px;font-weight:600;cursor:pointer;font-size:13px">Import All</button>
-          <span id="bulk-status" style="font-size:12px;color:#999"></span>
-        </div>
-      </div>
       <div class="chip-list" id="guest-chips"></div>
     </div>
 
@@ -2166,16 +2158,24 @@ ADMIN_HTML = r"""<!DOCTYPE html>
     const name = input.value.trim().replace(/[^a-zA-Z\s\-']/g, '').replace(/\s+/g, ' ').trim();
     if (!name) { input.value = ''; return; }
     input.value = '';
-    showToast('Added ' + name);
+    input.focus();
+    // Optimistically add chip
+    const chips = document.getElementById('guest-chips');
+    const emptyMsg = chips.querySelector('.empty-text');
+    if (emptyMsg) emptyMsg.remove();
+    const chip = document.createElement('span');
+    chip.className = 'chip';
+    chip.innerHTML = esc(name) + ' <button class="remove">&times;</button>';
+    chip.querySelector('.remove').onclick = () => removeGuest(name, chip);
+    chips.appendChild(chip);
     const res = await fetch('/api/admin/guest-list', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'add', name })
     });
     const d = await res.json();
-    if (res.ok) {
-      loadData();
-    } else {
+    if (!res.ok) {
+      chip.remove();
       showToast(d.error || 'Failed');
     }
   }
