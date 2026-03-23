@@ -860,7 +860,7 @@ MAIN_HTML = r"""<!DOCTYPE html>
   .detail-label { font-size: 12px; font-weight: 600; color: #999; text-transform: uppercase; letter-spacing: 0.06em; }
   .detail-value { font-size: 15px; font-weight: 500; color: #1a1a1a; margin-top: 1px; }
   .detail-action { align-self: center; flex-shrink: 0; }
-  .detail-link { font-size: 12px; font-weight: 600; color: #4a90d9; text-decoration: none; cursor: pointer; transition: color 0.2s; }
+  .detail-link { font-size: 12px; font-weight: 600; color: #4a90d9; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; transition: color 0.2s; }
   .detail-link:hover { color: #2a6cb8; }
   .detail-pin { font-size: 22px; text-decoration: none; cursor: pointer; transition: transform 0.2s; display: block; }
   .detail-pin:hover { transform: scale(1.15); }
@@ -1829,7 +1829,7 @@ ADMIN_HTML = r"""<!DOCTYPE html>
   .count-pill.going-pill { background: #e8f8ef; color: #1a7a42; }
   .count-pill.maybe-pill { background: #fff8e6; color: #9a7b20; }
   .count-pill.cant-pill { background: #fde8e8; color: #c0392b; }
-  .guest-section-label { font-size: 12px; font-weight: 700; color: #999; text-transform: uppercase; letter-spacing: 0.06em; margin-top: 20px; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid #f0eee9; scroll-margin-top: 80px; }
+  .guest-section-label { font-size: 12px; font-weight: 700; color: #999; text-transform: uppercase; letter-spacing: 0.06em; margin-top: 20px; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid #f0eee9; scroll-margin-top: 20px; }
   .guest-section-label:first-child { margin-top: 0; }
   .guest-list { list-style: none; }
   .guest-list li { padding: 12px 0; border-bottom: 1px solid #f0eee9; display: flex; align-items: center; gap: 14px; font-size: 15px; font-weight: 500; }
