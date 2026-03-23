@@ -863,11 +863,6 @@ MAIN_HTML = r"""<!DOCTYPE html>
   .detail-btn { display: inline-flex; align-items: center; gap: 4px; padding: 6px 12px; font-size: 12px; font-weight: 600; color: #555; background: #f5f3f0; border: 1px solid #e8e6e3; border-radius: 8px; cursor: pointer; text-decoration: none; transition: all 0.2s; white-space: nowrap; font-family: inherit; }
   .detail-btn:hover { background: #eeece8; color: #333; }
 
-  .countdown-bar { display: flex; justify-content: center; gap: 16px; padding: 14px 24px; border-bottom: 1px solid #eee; }
-  .countdown-unit { text-align: center; }
-  .countdown-num { font-size: 22px; font-weight: 700; color: #1a1a1a; font-family: 'DM Serif Display', Georgia, serif; }
-  .countdown-label { font-size: 10px; font-weight: 600; color: #999; text-transform: uppercase; letter-spacing: 0.08em; margin-top: 2px; }
-
   .byob-msg { font-size: 14px; color: #777; text-align: center; padding: 10px 0 2px; font-weight: 500; letter-spacing: 0.01em; }
 
   .tabs { display: flex; border-bottom: 1px solid #eee; position: sticky; top: 0; background: #fff; z-index: 10; }
@@ -1061,8 +1056,12 @@ MAIN_HTML = r"""<!DOCTYPE html>
   <div class="event-details">
     <div class="detail-row">
       <div class="detail-icon">&#128197;</div>
-      <div class="detail-text"><span class="detail-label">Date & Time</span><span class="detail-value">Saturday, May 2, 2026 &middot; 6:30 PM onwards</span></div>
+      <div class="detail-text"><span class="detail-label">Date</span><span class="detail-value">Saturday, May 2, 2026</span></div>
       <div class="detail-action"><a class="detail-btn" href="https://www.google.com/calendar/render?action=TEMPLATE&text=HOUSE+PARTY+V2&dates=20260502T083000Z/20260503T000000Z&details=Hosted+by+Krish+%26+James&location=50+Hordern+St%2C+Newtown+NSW" target="_blank" rel="noopener">&#128197; Add to Cal</a></div>
+    </div>
+    <div class="detail-row">
+      <div class="detail-icon">&#128336;</div>
+      <div class="detail-text"><span class="detail-label">Time</span><span class="detail-value">6:30 PM onwards</span></div>
     </div>
     <div class="detail-row">
       <div class="detail-icon">&#128205;</div>
@@ -1070,13 +1069,6 @@ MAIN_HTML = r"""<!DOCTYPE html>
       <div class="detail-action"><a class="detail-btn" href="https://www.google.com/maps/search/?api=1&query=50+Hordern+St%2C+Newtown+NSW" target="_blank" rel="noopener">&#128506; Map</a></div>
     </div>
     <div class="byob-msg">Drinks will be around, but BYO is the move &#127867;</div>
-  </div>
-
-  <div class="countdown-bar" id="countdown-bar">
-    <div class="countdown-unit"><div class="countdown-num" id="cd-days">--</div><div class="countdown-label">Days</div></div>
-    <div class="countdown-unit"><div class="countdown-num" id="cd-hours">--</div><div class="countdown-label">Hours</div></div>
-    <div class="countdown-unit"><div class="countdown-num" id="cd-mins">--</div><div class="countdown-label">Mins</div></div>
-    <div class="countdown-unit"><div class="countdown-num" id="cd-secs">--</div><div class="countdown-label">Secs</div></div>
   </div>
 
   <div class="tabs">
@@ -1693,26 +1685,6 @@ MAIN_HTML = r"""<!DOCTYPE html>
   }
   loadAnnouncements();
 
-  // Countdown timer — May 2, 2026 6:30 PM AEST (UTC+10)
-  function updateCountdown() {
-    const party = new Date('2026-05-02T18:30:00+10:00').getTime();
-    const now = Date.now();
-    const diff = party - now;
-    if (diff <= 0) {
-      document.getElementById('countdown-bar').innerHTML = '<div style="font-size:16px;font-weight:700;color:#1a1a1a">&#127881; It\'s party time!</div>';
-      return;
-    }
-    const d = Math.floor(diff / 86400000);
-    const h = Math.floor((diff % 86400000) / 3600000);
-    const m = Math.floor((diff % 3600000) / 60000);
-    const s = Math.floor((diff % 60000) / 1000);
-    document.getElementById('cd-days').textContent = d;
-    document.getElementById('cd-hours').textContent = h;
-    document.getElementById('cd-mins').textContent = m;
-    document.getElementById('cd-secs').textContent = s;
-  }
-  updateCountdown();
-  setInterval(updateCountdown, 1000);
 </script>
 </body>
 </html>
