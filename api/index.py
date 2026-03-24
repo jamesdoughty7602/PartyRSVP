@@ -200,34 +200,40 @@ def api_rsvps():
     # Get host-prefilled socials from guest_list table
     cur.execute("SELECT name, instagram, facebook FROM guest_list")
     gl_socials = {r["name"].lower(): r for r in cur.fetchall()}
+    # Get profile pics from placeholder rsvp entries (photo uploaded but not yet RSVP'd)
+    cur.execute("SELECT LOWER(name) as lname, profile_pic FROM rsvps WHERE status = '' AND profile_pic IS NOT NULL AND profile_pic != ''")
+    photo_placeholders = {r["lname"]: r["profile_pic"] for r in cur.fetchall()}
+    cur.execute("SELECT name FROM guest_list ORDER BY name")
+    gl_rows = cur.fetchall()
     conn.close()
 
     guests = []
     for r in rows:
         ig = r["instagram"] or ""
         fb = r["facebook"] or ""
-        # Fall back to guest_list socials if rsvps table has none
         gl = gl_socials.get(r["name"].lower())
         if not ig and gl and gl["instagram"]:
             ig = gl["instagram"]
         if not fb and gl and gl["facebook"]:
             fb = gl["facebook"]
         guests.append({"name": r["name"], "status": r["status"], "instagram": ig, "facebook": fb, "profile_pic": r["profile_pic"] or "", "time": str(r["updated_at"])})
-    rsvp_names_set = set(g["name"].lower() for g in guests)
+    rsvp_names = set(g["name"].lower() for g in guests)
 
     # Get invited guests who haven't RSVP'd yet
-    rsvp_names = set(g["name"].lower() for g in guests)
-    cur2 = conn.cursor() if not conn.closed else get_db().cursor()
-    conn2 = get_db()
-    cur2 = conn2.cursor()
-    cur2.execute("SELECT name FROM guest_list ORDER BY name")
-    gl_rows = cur2.fetchall()
-    conn2.close()
-    invited = [{"name": r["name"], "status": "invited"} for r in gl_rows if r["name"].lower() not in rsvp_names]
-    # Also add approved plus ones who haven't RSVP'd yet to invited
+    invited = []
+    for r in gl_rows:
+        if r["name"].lower() not in rsvp_names:
+            gl = gl_socials.get(r["name"].lower())
+            invited.append({
+                "name": r["name"],
+                "status": "invited",
+                "profile_pic": photo_placeholders.get(r["name"].lower(), ""),
+                "instagram": (gl["instagram"] or "") if gl else "",
+                "facebook": (gl["facebook"] or "") if gl else ""
+            })
     invited_names = set(i["name"].lower() for i in invited)
     for p in plus_ones:
-        if p["name"].lower() not in rsvp_names_set and p["name"].lower() not in invited_names:
+        if p["name"].lower() not in rsvp_names and p["name"].lower() not in invited_names:
             invited.append({"name": p["name"], "status": "invited"})
     invited.sort(key=lambda x: x["name"].lower())
 
@@ -1428,7 +1434,21 @@ MAIN_HTML = r"""<!DOCTYPE html>
         html += '<ul class="guest-list">' + invited.map(g => {
           const color = getAvatarColor(g.name);
           const isMe = myName && g.name.toLowerCase() === myName.toLowerCase();
-          return '<li style="opacity:0.5"><span class="avatar" style="background:' + color + '">' + escapeHtml(g.name.charAt(0).toUpperCase()) + '</span><span class="guest-name">' + escapeHtml(g.name) + '</span>' + (isMe ? '<span class="guest-badge badge-you">You</span>' : '') + '</li>';
+          let socials = '';
+          if (g.instagram || g.facebook) {
+            socials = '<span class="guest-socials">';
+            if (g.instagram) {
+              const igUrl = g.instagram.startsWith('http') ? g.instagram : 'https://instagram.com/' + g.instagram;
+              socials += '<a class="guest-social-link ig-link" href="' + escapeHtml(igUrl) + '" target="_blank" rel="noopener" title="Instagram">' + IG_SVG + '</a>';
+            }
+            if (g.facebook) {
+              const fbUrl = g.facebook.startsWith('http') ? g.facebook : 'https://facebook.com/' + g.facebook;
+              socials += '<a class="guest-social-link fb-link" href="' + escapeHtml(fbUrl) + '" target="_blank" rel="noopener" title="Facebook">' + FB_SVG + '</a>';
+            }
+            socials += '</span>';
+          }
+          const avatarHtml = g.profile_pic ? '<span class="avatar avatar-clickable" style="padding:0;overflow:hidden" onclick="expandAvatar(this)"><img src="' + g.profile_pic + '" style="width:100%;height:100%;object-fit:cover;border-radius:50%"></span>' : '<span class="avatar" style="background:' + color + '">' + escapeHtml(g.name.charAt(0).toUpperCase()) + '</span>';
+          return '<li style="opacity:0.5">' + avatarHtml + '<span class="guest-name">' + escapeHtml(g.name) + '</span>' + socials + (isMe ? '<span class="guest-badge badge-you">You</span>' : '') + '</li>';
         }).join('') + '</ul>';
       }
       container.innerHTML = html;
@@ -2416,8 +2436,10 @@ ADMIN_HTML = r"""<!DOCTYPE html>
         }
         socials += '</span>';
       }
-      const removePhotoLink = g.profile_pic ? '<a onclick="event.preventDefault();removePhoto(\'' + escapeHtml(g.name).replace(/'/g, "\\'") + '\')" href="#" style="font-size:9px;color:#c0392b;text-decoration:underline;cursor:pointer;display:block;text-align:center;margin-top:2px">remove photo</a>' : '';
-      const avatarHtml = g.profile_pic ? '<div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0"><span class="avatar avatar-clickable" style="padding:0;overflow:hidden" onclick="expandAvatar(this)"><img src="' + g.profile_pic + '" style="width:100%;height:100%;object-fit:cover;border-radius:50%"></span>' + removePhotoLink + '</div>' : '<span class="avatar" style="background:' + color + '">' + escapeHtml(g.name.charAt(0).toUpperCase()) + '</span>';
+      const safeName = escapeHtml(g.name).replace(/'/g, "\\'");
+      const removePhotoLink = g.profile_pic ? '<a onclick="event.preventDefault();removePhoto(\'' + safeName + '\')" href="#" style="font-size:9px;color:#c0392b;text-decoration:underline;cursor:pointer;display:block;text-align:center;margin-top:2px">remove photo</a>' : '';
+      const addPhotoLink = !g.profile_pic ? '<a onclick="event.preventDefault();document.getElementById(\'admin-photo-input-' + g.name.replace(/[^a-zA-Z0-9]/g,'') + '\').click()" href="#" style="font-size:9px;color:#4a90d9;text-decoration:underline;cursor:pointer;display:block;text-align:center;margin-top:2px">add photo</a><input type="file" id="admin-photo-input-' + g.name.replace(/[^a-zA-Z0-9]/g,'') + '" accept="image/*" style="display:none" onchange="adminUploadPhoto(this,\'' + safeName + '\')">' : '';
+      const avatarHtml = g.profile_pic ? '<div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0"><span class="avatar avatar-clickable" style="padding:0;overflow:hidden" onclick="expandAvatar(this)"><img src="' + g.profile_pic + '" style="width:100%;height:100%;object-fit:cover;border-radius:50%"></span>' + removePhotoLink + '</div>' : '<div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0"><span class="avatar" style="background:' + color + '">' + escapeHtml(g.name.charAt(0).toUpperCase()) + '</span>' + addPhotoLink + '</div>';
       return '<li>' + avatarHtml + '<span class="guest-name">' + escapeHtml(g.name) + '</span>' + socials + (isMe ? '<span class="guest-badge badge-you">You</span>' : '') + '</li>';
     }).join('') + '</ul>';
   }
@@ -2431,6 +2453,36 @@ ADMIN_HTML = r"""<!DOCTYPE html>
     });
     showToast('Photo removed for ' + name);
     renderAdminGuestList();
+  }
+
+  function adminUploadPhoto(input, name) {
+    if (!input.files || !input.files[0]) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const img = new Image();
+      img.onload = function() {
+        const canvas = document.createElement('canvas');
+        let w = img.width, h = img.height;
+        const maxDim = 500;
+        if (w > h) { if (w > maxDim) { h = h * maxDim / w; w = maxDim; } }
+        else { if (h > maxDim) { w = w * maxDim / h; h = maxDim; } }
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        const base64 = canvas.toDataURL('image/jpeg', 0.85);
+        fetch('/api/upload-photo', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: name, photo: base64 })
+        }).then(res => {
+          if (res.ok) {
+            showToast('Photo added for ' + name);
+            renderAdminGuestList();
+          } else { showToast('Could not upload photo'); }
+        });
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(input.files[0]);
   }
 
   function expandAvatar(el) {
@@ -2498,7 +2550,24 @@ ADMIN_HTML = r"""<!DOCTYPE html>
         html += '<div class="guest-section-label" id="admin-section-invited" style="color:#bbb">Invited &#9993;&#65039;</div>';
         html += '<ul class="guest-list">' + invited.map(g => {
           const color = getAvatarColor(g.name);
-          return '<li style="opacity:0.5"><span class="avatar" style="background:' + color + '">' + escapeHtml(g.name.charAt(0).toUpperCase()) + '</span><span class="guest-name">' + escapeHtml(g.name) + '</span></li>';
+          const safeName = escapeHtml(g.name).replace(/'/g, "\\'");
+          let socials = '';
+          if (g.instagram || g.facebook) {
+            socials = '<span class="guest-socials">';
+            if (g.instagram) {
+              const igUrl = g.instagram.startsWith('http') ? g.instagram : 'https://instagram.com/' + g.instagram;
+              socials += '<a class="guest-social-link ig-link" href="' + escapeHtml(igUrl) + '" target="_blank" rel="noopener" title="Instagram">' + IG_SVG + '</a>';
+            }
+            if (g.facebook) {
+              const fbUrl = g.facebook.startsWith('http') ? g.facebook : 'https://facebook.com/' + g.facebook;
+              socials += '<a class="guest-social-link fb-link" href="' + escapeHtml(fbUrl) + '" target="_blank" rel="noopener" title="Facebook">' + FB_SVG + '</a>';
+            }
+            socials += '</span>';
+          }
+          const addPhotoLink = !g.profile_pic ? '<a onclick="event.preventDefault();document.getElementById(\'admin-photo-input-' + g.name.replace(/[^a-zA-Z0-9]/g,'') + '\').click()" href="#" style="font-size:9px;color:#4a90d9;text-decoration:underline;cursor:pointer;display:block;text-align:center;margin-top:2px">add photo</a><input type="file" id="admin-photo-input-' + g.name.replace(/[^a-zA-Z0-9]/g,'') + '" accept="image/*" style="display:none" onchange="adminUploadPhoto(this,\'' + safeName + '\')">' : '';
+          const removePhotoLink = g.profile_pic ? '<a onclick="event.preventDefault();removePhoto(\'' + safeName + '\')" href="#" style="font-size:9px;color:#c0392b;text-decoration:underline;cursor:pointer;display:block;text-align:center;margin-top:2px">remove photo</a>' : '';
+          const avatarHtml = g.profile_pic ? '<div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0"><span class="avatar avatar-clickable" style="padding:0;overflow:hidden" onclick="expandAvatar(this)"><img src="' + g.profile_pic + '" style="width:100%;height:100%;object-fit:cover;border-radius:50%"></span>' + removePhotoLink + '</div>' : '<div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0"><span class="avatar" style="background:' + color + '">' + escapeHtml(g.name.charAt(0).toUpperCase()) + '</span>' + addPhotoLink + '</div>';
+          return '<li style="opacity:0.5">' + avatarHtml + '<span class="guest-name">' + escapeHtml(g.name) + '</span>' + socials + '</li>';
         }).join('') + '</ul>';
       }
       container.innerHTML = html;
