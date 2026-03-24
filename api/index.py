@@ -262,7 +262,7 @@ def api_my_status():
     conn.close()
     if row:
         return jsonify({"found": True, "status": row["status"], "approved": row["approved"], "instagram": row["instagram"] or "", "facebook": row["facebook"] or "", "phone": row["phone"] or "", "profile_pic": row["profile_pic"] or "", "host_instagram": host_ig, "host_facebook": host_fb})
-    return jsonify({"found": False})
+    return jsonify({"found": False, "host_instagram": host_ig, "host_facebook": host_fb})
 
 
 @app.route("/api/plus-ones")
@@ -1346,6 +1346,27 @@ MAIN_HTML = r"""<!DOCTYPE html>
           fbInput.style.opacity = '0.6';
           fbInput.style.cursor = 'not-allowed';
           fbInput.title = 'Pre-filled by the host';
+        }
+      } else {
+        // New guest — still pre-fill host socials if available
+        if (data.host_instagram || data.host_facebook) {
+          document.getElementById('socials-section').style.display = '';
+          if (data.host_instagram) {
+            const igInput = document.getElementById('ig-input');
+            igInput.value = data.host_instagram;
+            igInput.readOnly = true;
+            igInput.style.opacity = '0.6';
+            igInput.style.cursor = 'not-allowed';
+            igInput.title = 'Pre-filled by the host';
+          }
+          if (data.host_facebook) {
+            const fbInput = document.getElementById('fb-input');
+            fbInput.value = data.host_facebook;
+            fbInput.readOnly = true;
+            fbInput.style.opacity = '0.6';
+            fbInput.style.cursor = 'not-allowed';
+            fbInput.title = 'Pre-filled by the host';
+          }
         }
       }
       const poRes = await fetch('/api/plus-ones?name=' + encodeURIComponent(name));
