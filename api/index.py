@@ -359,7 +359,7 @@ def api_rsvp():
     cur.execute("SELECT id FROM rsvps WHERE LOWER(name) = LOWER(%s)", (name,))
     existing = cur.fetchone()
     if existing:
-        cur.execute("UPDATE rsvps SET status = %s, instagram = %s, facebook = %s, updated_at = NOW() WHERE id = %s", (status, instagram, facebook, existing["id"]))
+        cur.execute("UPDATE rsvps SET status = %s, approved = %s, instagram = %s, facebook = %s, updated_at = NOW() WHERE id = %s", (status, approved, instagram, facebook, existing["id"]))
     else:
         cur.execute("INSERT INTO rsvps (name, status, approved, instagram, facebook) VALUES (%s, %s, %s, %s, %s)", (name, status, approved, instagram, facebook))
     conn.commit()
@@ -430,9 +430,11 @@ def api_upload_photo():
     cur.execute("SELECT id FROM rsvps WHERE LOWER(name) = LOWER(%s)", (name,))
     existing = cur.fetchone()
     if not existing:
-        conn.close()
-        return jsonify({"error": "RSVP not found"}), 404
-    cur.execute("UPDATE rsvps SET profile_pic = %s, updated_at = NOW() WHERE id = %s", (photo, existing["id"]))
+        # Guest hasn't RSVP'd yet — create a pre-rsvp entry just to store the photo
+        # When they RSVP later, the existing row will be updated with their status
+        cur.execute("INSERT INTO rsvps (name, status, approved, profile_pic) VALUES (%s, '', 0, %s)", (name, photo))
+    else:
+        cur.execute("UPDATE rsvps SET profile_pic = %s, updated_at = NOW() WHERE id = %s", (photo, existing["id"]))
     conn.commit()
     conn.close()
     return jsonify({"ok": True})
@@ -1319,17 +1321,19 @@ MAIN_HTML = r"""<!DOCTYPE html>
           circle.style.borderColor = '#e8e6e3';
         }
         const area = document.getElementById('status-area');
-        if (data.approved === 1) {
+        if (data.status && data.approved === 1) {
           const statusStyle = data.status === 'maybe' ? 'maybe-status' : data.status === 'cant_go' ? 'cantgo-status' : 'approved';
           const icon = data.status === 'cant_go' ? '&#128532;' : '&#10003;';
           area.innerHTML = '<div class="status-msg ' + statusStyle + '">' + icon + ' You\'re RSVP\'d as <strong>' + STATUS_LABELS[data.status] + '</strong>. You can change your status anytime.</div>';
-        } else {
+        } else if (data.status && data.approved === 0) {
           area.innerHTML = '<div class="status-msg pending">&#9203; Your RSVP is awaiting host approval. We\'ll add you to the list once confirmed.</div>';
         }
-        updateSelectedButton(data.status);
-        const firstName = name.split(' ')[0];
-        document.getElementById('rsvp-intro').querySelector('h2').innerHTML = 'Welcome back, <span class="gradient-name">' + escapeHtml(firstName) + '</span>!';
-        document.getElementById('rsvp-intro').querySelector('p').textContent = '';
+        if (data.status) updateSelectedButton(data.status);
+        if (data.status) {
+          const firstName = name.split(' ')[0];
+          document.getElementById('rsvp-intro').querySelector('h2').innerHTML = 'Welcome back, <span class="gradient-name">' + escapeHtml(firstName) + '</span>!';
+          document.getElementById('rsvp-intro').querySelector('p').textContent = '';
+        }
         document.getElementById('socials-section').style.display = '';
         document.getElementById('ig-input').value = data.instagram || data.host_instagram || '';
         document.getElementById('fb-input').value = data.facebook || data.host_facebook || '';
