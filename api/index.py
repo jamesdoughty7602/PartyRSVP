@@ -1723,19 +1723,36 @@ MAIN_HTML = r"""<!DOCTYPE html>
     const friendPhone = formatAusPhone(rawPhone);
     if (!friendPhone) { showToast('Please enter a valid Australian mobile number (04XX XXX XXX)'); return; }
     phoneInput.value = friendPhone;
-    try {
-      const res = await fetch('/api/plus-one', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ added_by: name, name: friendName, phone: friendPhone })
-      });
-      const data = await res.json();
-      if (!res.ok) { showToast(data.error || 'Failed to add'); return; }
-      input.value = '';
-      phoneInput.value = '';
-      showToast('&#10003; ' + escapeHtml(friendName) + ' added — pending approval');
-      loadPlusOnes();
-    } catch (e) { showToast('Something went wrong'); }
+    // Optimistic UI — add to list immediately
+    const list = document.getElementById('plusone-list');
+    const color = getAvatarColor(friendName);
+    const tempId = 'temp-' + Date.now();
+    const emptyMsg = list.querySelector('.empty-state');
+    if (emptyMsg) emptyMsg.remove();
+    list.insertAdjacentHTML('beforeend', '<div class="plusone-item" id="' + tempId + '" style="opacity:0.7"><span class="avatar" style="background:' + color + ';width:36px;height:36px;font-size:14px">' + escapeHtml(friendName.charAt(0).toUpperCase()) + '</span><span class="plusone-name">' + escapeHtml(friendName) + '</span><span class="plusone-status pending">Pending</span></div>');
+    input.value = '';
+    phoneInput.value = '';
+    showToast('&#10003; ' + escapeHtml(friendName) + ' added — pending approval');
+    // Send to server in background
+    fetch('/api/plus-one', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ added_by: name, name: friendName, phone: friendPhone })
+    }).then(res => {
+      if (!res.ok) {
+        const el = document.getElementById(tempId);
+        if (el) el.remove();
+        res.json().then(d => showToast(d.error || 'Failed to add'));
+      } else {
+        const el = document.getElementById(tempId);
+        if (el) el.style.opacity = '1';
+        loadPlusOnes();
+      }
+    }).catch(() => {
+      const el = document.getElementById(tempId);
+      if (el) el.remove();
+      showToast('Something went wrong');
+    });
   }
 
   async function removePlusOne(id) {
