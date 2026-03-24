@@ -197,9 +197,22 @@ def api_rsvps():
     rows = cur.fetchall()
     cur.execute("SELECT name, created_at FROM plus_ones WHERE approved = 1 ORDER BY created_at DESC")
     plus_ones = cur.fetchall()
+    # Get host-prefilled socials from guest_list table
+    cur.execute("SELECT name, instagram, facebook FROM guest_list")
+    gl_socials = {r["name"].lower(): r for r in cur.fetchall()}
     conn.close()
 
-    guests = [{"name": r["name"], "status": r["status"], "instagram": r["instagram"] or "", "facebook": r["facebook"] or "", "profile_pic": r["profile_pic"] or "", "time": str(r["updated_at"])} for r in rows]
+    guests = []
+    for r in rows:
+        ig = r["instagram"] or ""
+        fb = r["facebook"] or ""
+        # Fall back to guest_list socials if rsvps table has none
+        gl = gl_socials.get(r["name"].lower())
+        if not ig and gl and gl["instagram"]:
+            ig = gl["instagram"]
+        if not fb and gl and gl["facebook"]:
+            fb = gl["facebook"]
+        guests.append({"name": r["name"], "status": r["status"], "instagram": ig, "facebook": fb, "profile_pic": r["profile_pic"] or "", "time": str(r["updated_at"])})
     rsvp_names_set = set(g["name"].lower() for g in guests)
 
     # Get invited guests who haven't RSVP'd yet
@@ -2361,8 +2374,8 @@ ADMIN_HTML = r"""<!DOCTYPE html>
         }
         socials += '</span>';
       }
-      const removePhotoBtn = g.profile_pic ? '<button onclick="event.stopPropagation();removePhoto(\'' + escapeHtml(g.name).replace(/'/g, "\\'") + '\')" style="position:absolute;top:-4px;right:-4px;width:18px;height:18px;border-radius:50%;background:#e74c3c;color:#fff;border:2px solid #fff;font-size:10px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0" title="Remove photo">&times;</button>' : '';
-      const avatarHtml = g.profile_pic ? '<span class="avatar avatar-clickable" style="padding:0;overflow:hidden;position:relative" onclick="expandAvatar(this)"><img src="' + g.profile_pic + '" style="width:100%;height:100%;object-fit:cover;border-radius:50%">' + removePhotoBtn + '</span>' : '<span class="avatar" style="background:' + color + '">' + escapeHtml(g.name.charAt(0).toUpperCase()) + '</span>';
+      const removePhotoLink = g.profile_pic ? '<a onclick="event.preventDefault();removePhoto(\'' + escapeHtml(g.name).replace(/'/g, "\\'") + '\')" href="#" style="font-size:9px;color:#c0392b;text-decoration:underline;cursor:pointer;display:block;text-align:center;margin-top:2px">remove photo</a>' : '';
+      const avatarHtml = g.profile_pic ? '<div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0"><span class="avatar avatar-clickable" style="padding:0;overflow:hidden" onclick="expandAvatar(this)"><img src="' + g.profile_pic + '" style="width:100%;height:100%;object-fit:cover;border-radius:50%"></span>' + removePhotoLink + '</div>' : '<span class="avatar" style="background:' + color + '">' + escapeHtml(g.name.charAt(0).toUpperCase()) + '</span>';
       return '<li>' + avatarHtml + '<span class="guest-name">' + escapeHtml(g.name) + '</span>' + socials + (isMe ? '<span class="guest-badge badge-you">You</span>' : '') + '</li>';
     }).join('') + '</ul>';
   }
@@ -2401,11 +2414,14 @@ ADMIN_HTML = r"""<!DOCTYPE html>
   }
 
   async function renderAdminGuestList() {
+    const container = document.getElementById('admin-guest-list-container');
+    if (!container.innerHTML.trim() || container.innerHTML.includes('empty-state')) {
+      container.innerHTML = '<div style="text-align:center;padding:40px 0;color:#bbb"><div class="spinner" style="margin:0 auto 12px"></div>Loading guest list...</div>';
+    }
     try {
       const res = await fetch('/api/rsvps');
       const data = await res.json();
       const pills = document.getElementById('admin-count-pills');
-      const container = document.getElementById('admin-guest-list-container');
 
       pills.innerHTML = '';
       if (data.going_count > 0) pills.innerHTML += '<span class="count-pill going-pill" style="cursor:pointer" onclick="document.getElementById(\'admin-section-going\').scrollIntoView({behavior:\'smooth\',block:\'start\'})">' + data.going_count + ' going</span>';
