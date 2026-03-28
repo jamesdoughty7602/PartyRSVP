@@ -966,7 +966,15 @@ MAIN_HTML = r"""<!DOCTYPE html>
 
   /* RSVP Form */
   .rsvp-intro { text-align: center; margin-bottom: 28px; }
-  .rsvp-intro h2 { font-family: 'DM Serif Display', Georgia, serif; font-size: 24px; font-weight: 400; margin-bottom: 8px; }
+  .rsvp-intro h2 {
+    font-family: 'DM Serif Display', Georgia, serif; font-size: 24px; font-weight: 400; margin-bottom: 8px;
+    background: linear-gradient(135deg, #ff6b9d, #c44dff, #6e8efb, #4dc9f6);
+    background-size: 300% 300%;
+    animation: gradientShift 8s ease infinite;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
   .gradient-name {
     background: linear-gradient(135deg, #ff6b9d, #c44dff, #6e8efb, #4dc9f6);
     background-size: 300% 300%;
@@ -1577,12 +1585,7 @@ MAIN_HTML = r"""<!DOCTYPE html>
     updateSelectedButton(status);
     localStorage.setItem(STORAGE_KEY, name);
     const area = document.getElementById('status-area');
-    const alreadyRsvpd = area.querySelector('.status-msg');
-    if (alreadyRsvpd || status !== 'going') {
-      showToast('&#10003; Status updated to ' + STATUS_LABELS[status]);
-    } else {
-      showToast('&#127881; You\'re on the list!');
-    }
+    showToast('&#10003; RSVP\'d as ' + STATUS_LABELS[status]);
     const statusStyle = status === 'maybe' ? 'maybe-status' : status === 'cant_go' ? 'cantgo-status' : 'approved';
     const icon = status === 'cant_go' ? '&#128532;' : '&#10003;';
     area.innerHTML = '<div class="status-msg ' + statusStyle + '">' + icon + ' You\'re RSVP\'d as <strong>' + STATUS_LABELS[status] + '</strong>. You can change your status anytime.</div>';
