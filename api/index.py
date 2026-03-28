@@ -1847,7 +1847,7 @@ MAIN_HTML = r"""<!DOCTYPE html>
           const timeStr = months[d.getMonth()] + ' ' + d.getDate() + ' at ' + h12 + ':' + (m < 10 ? '0' : '') + m + ' ' + ampm;
           const isVideo = a.photo && (a.photo.startsWith('data:video/') || a.photo.match(/\.(mp4|mov|webm)$/i));
           const mediaHtml = a.photo ? (isVideo ? '<div style="margin-top:8px"><video src="' + a.photo + '" controls playsinline style="max-width:100%;border-radius:10px"></video></div>' : '<div style="margin-top:8px"><img src="' + a.photo + '" style="max-width:100%;border-radius:10px"></div>') : '';
-          return '<div style="background:#fff;border-radius:14px;padding:16px 18px;margin-bottom:12px;border:1px solid #eee;box-shadow:0 2px 8px rgba(0,0,0,0.04)">' + mediaHtml + (a.message ? '<div style="font-size:14px;line-height:1.5;color:#333">' + escapeHtml(a.message) + '</div>' : '') + '<div style="font-size:11px;color:#aaa;margin-top:8px">' + timeStr + '</div></div>';
+          return '<div style="background:#fff;border-radius:14px;padding:16px 18px;margin-bottom:12px;border:1px solid #eee;box-shadow:0 2px 8px rgba(0,0,0,0.04)">' + mediaHtml + (a.message ? '<div style="font-size:14px;line-height:1.5;color:#333;word-break:break-word;overflow-wrap:break-word">' + escapeHtml(a.message) + '</div>' : '') + '<div style="font-size:11px;color:#aaa;margin-top:8px">' + timeStr + '</div></div>';
         }).join('');
         // Mark announcements as seen if guest has an invite token
         const token = localStorage.getItem('krish_james_party_v2_token');
