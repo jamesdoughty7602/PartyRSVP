@@ -1570,23 +1570,23 @@ MAIN_HTML = r"""<!DOCTYPE html>
     const buttons = document.querySelectorAll('.rsvp-btn');
     buttons.forEach(b => b.disabled = true);
 
-    try {
-      const res = await fetch('/api/rsvp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, status })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Something went wrong');
+    // Trigger celebration instantly
+    if (status === 'going') confettiShower();
+    else if (status === 'cant_go') sadShower();
+    else if (status === 'maybe') maybeExplosion();
+    updateSelectedButton(status);
 
+    // Submit to server in background
+    fetch('/api/rsvp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, status })
+    }).then(res => res.json().then(data => {
+      if (!res.ok) {
+        errEl.textContent = data.error || 'Something went wrong';
+        return;
+      }
       localStorage.setItem(STORAGE_KEY, name);
-
-      if (status === 'going') confettiShower();
-      else if (status === 'cant_go') sadShower();
-      else if (status === 'maybe') maybeExplosion();
-
-      updateSelectedButton(status);
-
       if (data.approved) {
         if (data.updated) {
           showToast('&#10003; Status updated to ' + STATUS_LABELS[status]);
@@ -1598,11 +1598,11 @@ MAIN_HTML = r"""<!DOCTYPE html>
       }
       refreshMyStatus();
       document.getElementById('socials-section').style.display = '';
-    } catch (err) {
-      errEl.textContent = err.message;
-    } finally {
+    })).catch(err => {
+      errEl.textContent = err.message || 'Something went wrong';
+    }).finally(() => {
       buttons.forEach(b => b.disabled = false);
-    }
+    });
   }
 
   // Celebration animations
@@ -1761,7 +1761,7 @@ MAIN_HTML = r"""<!DOCTYPE html>
     if (!friendName) { showToast('Please enter their name'); return; }
     const nameParts = friendName.split(/\s+/);
     if (nameParts.length < 2 || nameParts[nameParts.length - 1].length < 2) {
-      showToast('Please enter their full name (first & last, at least 2 characters each)');
+      showToast('Please enter their full name');
       return;
     }
     if (!rawPhone) { showToast('Phone number is required for plus ones'); return; }
