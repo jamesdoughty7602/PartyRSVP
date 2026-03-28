@@ -1576,9 +1576,13 @@ MAIN_HTML = r"""<!DOCTYPE html>
     else if (status === 'maybe') maybeExplosion();
     updateSelectedButton(status);
     localStorage.setItem(STORAGE_KEY, name);
-    showToast('&#127881; You\'re on the list!');
-    // Update status message instantly
     const area = document.getElementById('status-area');
+    const alreadyRsvpd = area.querySelector('.status-msg');
+    if (alreadyRsvpd) {
+      showToast('&#10003; Status updated to ' + STATUS_LABELS[status]);
+    } else {
+      showToast('&#127881; You\'re on the list!');
+    }
     const statusStyle = status === 'maybe' ? 'maybe-status' : status === 'cant_go' ? 'cantgo-status' : 'approved';
     const icon = status === 'cant_go' ? '&#128532;' : '&#10003;';
     area.innerHTML = '<div class="status-msg ' + statusStyle + '">' + icon + ' You\'re RSVP\'d as <strong>' + STATUS_LABELS[status] + '</strong>. You can change your status anytime.</div>';
