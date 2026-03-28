@@ -1835,8 +1835,9 @@ MAIN_HTML = r"""<!DOCTYPE html>
           const ampm = h >= 12 ? 'PM' : 'AM';
           const h12 = h % 12 || 12;
           const timeStr = months[d.getMonth()] + ' ' + d.getDate() + ' at ' + h12 + ':' + (m < 10 ? '0' : '') + m + ' ' + ampm;
-          const photoHtml = a.photo ? '<div style="margin-top:8px"><img src="' + a.photo + '" style="max-width:100%;border-radius:10px"></div>' : '';
-          return '<div style="background:#fff;border-radius:14px;padding:16px 18px;margin-bottom:12px;border:1px solid #eee;box-shadow:0 2px 8px rgba(0,0,0,0.04)">' + photoHtml + (a.message ? '<div style="font-size:14px;line-height:1.5;color:#333">' + escapeHtml(a.message) + '</div>' : '') + '<div style="font-size:11px;color:#aaa;margin-top:8px">' + timeStr + '</div></div>';
+          const isVideo = a.photo && (a.photo.startsWith('data:video/') || a.photo.match(/\.(mp4|mov|webm)$/i));
+          const mediaHtml = a.photo ? (isVideo ? '<div style="margin-top:8px"><video src="' + a.photo + '" controls playsinline style="max-width:100%;border-radius:10px"></video></div>' : '<div style="margin-top:8px"><img src="' + a.photo + '" style="max-width:100%;border-radius:10px"></div>') : '';
+          return '<div style="background:#fff;border-radius:14px;padding:16px 18px;margin-bottom:12px;border:1px solid #eee;box-shadow:0 2px 8px rgba(0,0,0,0.04)">' + mediaHtml + (a.message ? '<div style="font-size:14px;line-height:1.5;color:#333">' + escapeHtml(a.message) + '</div>' : '') + '<div style="font-size:11px;color:#aaa;margin-top:8px">' + timeStr + '</div></div>';
         }).join('');
         // Mark announcements as seen if guest has an invite token
         const token = localStorage.getItem('krish_james_party_v2_token');
@@ -2072,10 +2073,10 @@ ADMIN_HTML = r"""<!DOCTYPE html>
         <textarea id="announcement-input" placeholder="e.g. It's raining — bring jackets! &#9748;&#65039;" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'" style="flex:1;padding:10px 14px;font-size:14px;border:1px solid #e8e6e3;border-radius:12px;resize:none;min-height:60px;overflow:hidden;font-family:inherit"></textarea>
         <div style="display:flex;flex-direction:column;gap:6px;align-self:flex-start">
           <button onclick="postAnnouncement()" style="padding:10px 20px;background:#222;color:#fff;border:none;border-radius:12px;font-weight:600;cursor:pointer;white-space:nowrap">Post</button>
-          <button onclick="document.getElementById('announcement-photo-input').click()" style="padding:8px 12px;background:#f5f4f2;color:#666;border:1px solid #e8e6e3;border-radius:10px;font-size:12px;cursor:pointer;white-space:nowrap" title="Attach photo">&#128247; Photo</button>
+          <button onclick="document.getElementById('announcement-photo-input').click()" style="padding:8px 12px;background:#f5f4f2;color:#666;border:1px solid #e8e6e3;border-radius:10px;font-size:12px;cursor:pointer;white-space:nowrap" title="Attach media">&#128247; Media</button>
         </div>
       </div>
-      <input type="file" id="announcement-photo-input" accept="image/*" style="display:none" onchange="handleAnnouncementPhoto(this)">
+      <input type="file" id="announcement-photo-input" accept="image/*,video/*,.gif" style="display:none" onchange="handleAnnouncementMedia(this)">
       <div id="announcement-photo-preview" style="margin-bottom:12px"></div>
       <div id="admin-announcements-list"></div>
     </div>
@@ -2656,25 +2657,40 @@ ADMIN_HTML = r"""<!DOCTYPE html>
 
   window._announcementPhoto = '';
 
-  function handleAnnouncementPhoto(input) {
+  function handleAnnouncementMedia(input) {
     if (!input.files || !input.files[0]) return;
     const file = input.files[0];
+    const isVideo = file.type.startsWith('video/');
+    const isGif = file.type === 'image/gif';
+    if (isVideo && file.size > 20 * 1024 * 1024) {
+      showToast('Video must be under 20MB');
+      input.value = '';
+      return;
+    }
     const reader = new FileReader();
     reader.onload = function(e) {
-      const img = new Image();
-      img.onload = function() {
-        const canvas = document.createElement('canvas');
-        let w = img.width, h = img.height;
-        const maxDim = 800;
-        if (w > h) { if (w > maxDim) { h = h * maxDim / w; w = maxDim; } }
-        else { if (h > maxDim) { w = w * maxDim / h; h = maxDim; } }
-        canvas.width = w; canvas.height = h;
-        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-        window._announcementPhoto = canvas.toDataURL('image/jpeg', 0.7);
-        const preview = document.getElementById('announcement-photo-preview');
+      const preview = document.getElementById('announcement-photo-preview');
+      if (isVideo) {
+        window._announcementPhoto = e.target.result;
+        preview.innerHTML = '<div style="position:relative;display:inline-block"><video src="' + window._announcementPhoto + '" style="max-width:200px;border-radius:8px;border:1px solid #e8e6e3" muted></video><button onclick="clearAnnouncementPhoto()" style="position:absolute;top:-6px;right:-6px;background:#c0392b;color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:12px;cursor:pointer;line-height:20px">&times;</button></div>';
+      } else if (isGif) {
+        window._announcementPhoto = e.target.result;
         preview.innerHTML = '<div style="position:relative;display:inline-block"><img src="' + window._announcementPhoto + '" style="max-width:200px;border-radius:8px;border:1px solid #e8e6e3"><button onclick="clearAnnouncementPhoto()" style="position:absolute;top:-6px;right:-6px;background:#c0392b;color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:12px;cursor:pointer;line-height:20px">&times;</button></div>';
-      };
-      img.src = e.target.result;
+      } else {
+        const img = new Image();
+        img.onload = function() {
+          const canvas = document.createElement('canvas');
+          let w = img.width, h = img.height;
+          const maxDim = 800;
+          if (w > h) { if (w > maxDim) { h = h * maxDim / w; w = maxDim; } }
+          else { if (h > maxDim) { w = w * maxDim / h; h = maxDim; } }
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          window._announcementPhoto = canvas.toDataURL('image/jpeg', 0.7);
+          preview.innerHTML = '<div style="position:relative;display:inline-block"><img src="' + window._announcementPhoto + '" style="max-width:200px;border-radius:8px;border:1px solid #e8e6e3"><button onclick="clearAnnouncementPhoto()" style="position:absolute;top:-6px;right:-6px;background:#c0392b;color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:12px;cursor:pointer;line-height:20px">&times;</button></div>';
+        };
+        img.src = e.target.result;
+      }
     };
     reader.readAsDataURL(file);
   }
@@ -2749,7 +2765,8 @@ ADMIN_HTML = r"""<!DOCTYPE html>
       const ampm = h >= 12 ? 'PM' : 'AM';
       const h12 = h % 12 || 12;
       const timeStr = months[d.getMonth()] + ' ' + d.getDate() + ' at ' + h12 + ':' + (m < 10 ? '0' : '') + m + ' ' + ampm;
-      const photoHtml = a.photo ? '<div style="margin-top:8px"><img src="' + a.photo + '" style="max-width:200px;border-radius:8px"></div>' : '';
+      const isVid = a.photo && (a.photo.startsWith('data:video/') || a.photo.match(/\.(mp4|mov|webm)$/i));
+      const photoHtml = a.photo ? (isVid ? '<div style="margin-top:8px"><video src="' + a.photo + '" controls playsinline muted style="max-width:200px;border-radius:8px"></video></div>' : '<div style="margin-top:8px"><img src="' + a.photo + '" style="max-width:200px;border-radius:8px"></div>') : '';
       const seenHtml = '<span onclick="showAnnouncementViewers(' + a.id + ')" style="cursor:pointer;color:#3498db;font-size:11px;margin-left:8px" title="Click to see who">&#128065; Seen by ' + (a.view_count || 0) + '</span>';
       return '<div style="background:#f9f8f6;border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:flex-start;gap:10px"><div style="flex:1">' + photoHtml + '<div style="font-size:14px;line-height:1.5">' + esc(a.message) + '</div><div style="font-size:11px;color:#999;margin-top:4px">' + timeStr + seenHtml + '</div></div><button onclick="deleteAnnouncement(' + a.id + ')" style="background:none;border:none;color:#c0392b;font-size:18px;cursor:pointer;padding:0 4px;font-weight:700;flex-shrink:0" title="Delete">&times;</button></div>';
     }).join('');
