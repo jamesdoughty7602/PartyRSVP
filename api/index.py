@@ -1578,7 +1578,7 @@ MAIN_HTML = r"""<!DOCTYPE html>
     localStorage.setItem(STORAGE_KEY, name);
     const area = document.getElementById('status-area');
     const alreadyRsvpd = area.querySelector('.status-msg');
-    if (alreadyRsvpd) {
+    if (alreadyRsvpd || status !== 'going') {
       showToast('&#10003; Status updated to ' + STATUS_LABELS[status]);
     } else {
       showToast('&#127881; You\'re on the list!');
