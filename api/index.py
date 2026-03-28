@@ -966,8 +966,8 @@ MAIN_HTML = r"""<!DOCTYPE html>
 
   /* RSVP Form */
   .rsvp-intro { text-align: center; margin-bottom: 28px; }
-  .rsvp-intro h2 {
-    font-family: 'DM Serif Display', Georgia, serif; font-size: 24px; font-weight: 400; margin-bottom: 8px;
+  .rsvp-intro h2 { font-family: 'DM Serif Display', Georgia, serif; font-size: 24px; font-weight: 400; margin-bottom: 8px; }
+  .rsvp-intro h2.gradient-heading {
     background: linear-gradient(135deg, #ff6b9d, #c44dff, #6e8efb, #4dc9f6);
     background-size: 300% 300%;
     animation: gradientShift 8s ease infinite;
@@ -1186,7 +1186,7 @@ MAIN_HTML = r"""<!DOCTYPE html>
 
   <div class="panel" id="panel-rsvp">
     <div class="rsvp-intro" id="rsvp-intro">
-      <h2>You're Invited!</h2>
+      <h2 class="gradient-heading">You're Invited!</h2>
       <p>Let us know if you can make it. No app download needed.</p>
     </div>
     <form id="rsvp-form" onsubmit="return false;">
@@ -1345,7 +1345,7 @@ MAIN_HTML = r"""<!DOCTYPE html>
         if (data.status) updateSelectedButton(data.status);
         if (data.status) {
           const firstName = name.split(' ')[0];
-          document.getElementById('rsvp-intro').querySelector('h2').innerHTML = 'Welcome back, <span class="gradient-name">' + escapeHtml(firstName) + '</span>!';
+          var h2El = document.getElementById('rsvp-intro').querySelector('h2'); h2El.classList.remove('gradient-heading'); h2El.innerHTML = 'Welcome back, <span class="gradient-name">' + escapeHtml(firstName) + '</span>!';
           document.getElementById('rsvp-intro').querySelector('p').textContent = '';
         }
         document.getElementById('socials-section').style.display = '';
