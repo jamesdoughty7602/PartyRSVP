@@ -1570,11 +1570,24 @@ MAIN_HTML = r"""<!DOCTYPE html>
     const buttons = document.querySelectorAll('.rsvp-btn');
     buttons.forEach(b => b.disabled = true);
 
-    // Trigger celebration instantly
+    // Trigger everything instantly
     if (status === 'going') confettiShower();
     else if (status === 'cant_go') sadShower();
     else if (status === 'maybe') maybeExplosion();
     updateSelectedButton(status);
+    localStorage.setItem(STORAGE_KEY, name);
+    showToast('&#127881; You\'re on the list!');
+    // Update status message instantly
+    const area = document.getElementById('status-area');
+    const statusStyle = status === 'maybe' ? 'maybe-status' : status === 'cant_go' ? 'cantgo-status' : 'approved';
+    const icon = status === 'cant_go' ? '&#128532;' : '&#10003;';
+    area.innerHTML = '<div class="status-msg ' + statusStyle + '">' + icon + ' You\'re RSVP\'d as <strong>' + STATUS_LABELS[status] + '</strong>. You can change your status anytime.</div>';
+    // Update welcome text instantly
+    const firstName = name.split(' ')[0];
+    document.getElementById('rsvp-intro').querySelector('h2').innerHTML = 'Welcome back, <span class="gradient-name">' + escapeHtml(firstName) + '</span>!';
+    document.getElementById('rsvp-intro').querySelector('p').textContent = '';
+    document.getElementById('socials-section').style.display = '';
+    buttons.forEach(b => b.disabled = false);
 
     // Submit to server in background
     fetch('/api/rsvp', {
@@ -1586,22 +1599,12 @@ MAIN_HTML = r"""<!DOCTYPE html>
         errEl.textContent = data.error || 'Something went wrong';
         return;
       }
-      localStorage.setItem(STORAGE_KEY, name);
-      if (data.approved) {
-        if (data.updated) {
-          showToast('&#10003; Status updated to ' + STATUS_LABELS[status]);
-        } else {
-          showToast('&#127881; You\'re on the list!');
-        }
-      } else {
+      if (!data.approved) {
         showToast('&#9203; RSVP submitted — awaiting approval', 3500);
+        area.innerHTML = '<div class="status-msg pending">&#9203; Your RSVP is awaiting host approval. We\'ll add you to the list once confirmed.</div>';
       }
-      refreshMyStatus();
-      document.getElementById('socials-section').style.display = '';
     })).catch(err => {
       errEl.textContent = err.message || 'Something went wrong';
-    }).finally(() => {
-      buttons.forEach(b => b.disabled = false);
     });
   }
 
