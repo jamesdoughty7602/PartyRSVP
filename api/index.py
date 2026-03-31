@@ -2403,7 +2403,7 @@ ADMIN_HTML = r"""<!DOCTYPE html>
   }
 
   function copyLink(url, btnId) {
-    const text = "Hey! We're having a party soon, hope you can come! Click the link for all the info and to RSVP: " + url;
+    const text = url + "\n\nHey! We're having a party soon, hope you can come! Click the link for all the info and to RSVP.";
     navigator.clipboard.writeText(text).then(() => {
       const btn = document.getElementById(btnId);
       btn.textContent = 'Copied!';
