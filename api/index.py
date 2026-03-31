@@ -291,8 +291,8 @@ def event_ics():
         "VERSION:2.0\r\n"
         "PRODID:-//HousePartyV2//EN\r\n"
         "BEGIN:VEVENT\r\n"
-        "DTSTART:20260502T083000Z\r\n"
-        "DTEND:20260502T150000Z\r\n"
+        "DTSTART:20260516T083000Z\r\n"
+        "DTEND:20260516T150000Z\r\n"
         "SUMMARY:HOUSE PARTY V2\r\n"
         "DESCRIPTION:Hosted by Krish & James\r\n"
         "LOCATION:50 Hordern St\\, Newtown NSW\r\n"
@@ -1163,7 +1163,7 @@ MAIN_HTML = r"""<!DOCTYPE html>
   <div class="event-details">
     <div class="detail-row">
       <div class="detail-icon">&#128197;</div>
-      <div class="detail-text"><span class="detail-label">Date</span><span class="detail-value">Saturday, May 2, 2026</span></div>
+      <div class="detail-text"><span class="detail-label">Date</span><span class="detail-value">Saturday, May 16, 2026</span></div>
       <div class="detail-action"><a class="detail-link" href="/api/event.ics" download="house-party-v2.ics">add to calendar</a></div>
     </div>
     <div class="detail-row">
