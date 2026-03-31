@@ -2403,14 +2403,15 @@ ADMIN_HTML = r"""<!DOCTYPE html>
   }
 
   function copyLink(url, btnId) {
-    navigator.clipboard.writeText(url).then(() => {
+    const text = "Hey! We're having a party soon, hope you can come! Click the link for all the info and to RSVP: " + url;
+    navigator.clipboard.writeText(text).then(() => {
       const btn = document.getElementById(btnId);
       btn.textContent = 'Copied!';
       btn.classList.add('copied');
       setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
     }).catch(() => {
       const ta = document.createElement('textarea');
-      ta.value = url; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
       document.body.appendChild(ta); ta.select();
       document.execCommand('copy'); document.body.removeChild(ta);
       const btn = document.getElementById(btnId);
