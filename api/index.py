@@ -1456,7 +1456,8 @@ MAIN_HTML = r"""<!DOCTYPE html>
             socials += '</span>';
           }
           const avatarHtml = g.profile_pic ? '<span class="avatar avatar-clickable" style="padding:0;overflow:hidden" onclick="expandAvatar(this)"><img src="' + g.profile_pic + '" style="width:100%;height:100%;object-fit:cover;border-radius:50%"></span>' : '<span class="avatar" style="background:' + color + '">' + escapeHtml(g.name.charAt(0).toUpperCase()) + '</span>';
-          return '<li style="opacity:0.5">' + avatarHtml + '<span class="guest-name">' + escapeHtml(g.name) + '</span>' + socials + (isMe ? '<span class="guest-badge badge-you">You</span>' : '') + '</li>';
+          const dimmedAvatar = avatarHtml.replace(/style="([^"]*)"/, 'style="$1;opacity:0.5"');
+          return '<li>' + dimmedAvatar + '<span class="guest-name" style="opacity:0.5">' + escapeHtml(g.name) + '</span>' + socials + (isMe ? '<span class="guest-badge badge-you">You</span>' : '') + '</li>';
         }).join('') + '</ul>';
       }
       container.innerHTML = html;
