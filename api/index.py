@@ -997,8 +997,8 @@ MAIN_HTML = r"""<!DOCTYPE html>
   .profile-photo-upload { width: 60px; height: 60px; border-radius: 50%; border: 2px dashed #ccc; display: flex; align-items: center; justify-content: center; cursor: pointer; overflow: hidden; flex-shrink: 0; transition: border-color 0.2s; }
   .profile-photo-upload:hover { border-color: #999; }
   .profile-photo-upload img { width: 100%; height: 100%; object-fit: cover; }
-  .photo-hint { position: absolute; left: 0; bottom: 72px; background: #1a1a1a; color: #fff; font-size: 12px; font-family: 'DM Sans', sans-serif; padding: 6px 10px; border-radius: 8px; white-space: nowrap; pointer-events: none; animation: hintFadeIn 0.4s ease forwards; z-index: 10; }
-  .photo-hint::after { content: ''; position: absolute; bottom: -6px; left: 22px; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 6px solid #1a1a1a; }
+  .photo-hint { position: absolute; left: 76px; top: 50%; transform: translateY(-50%); background: #1a1a1a; color: #fff; font-size: 12px; font-family: 'DM Sans', sans-serif; padding: 6px 10px; border-radius: 8px; white-space: nowrap; pointer-events: none; animation: hintFadeIn 0.4s ease forwards; z-index: 10; }
+  .photo-hint::before { content: ''; position: absolute; left: -6px; top: 50%; transform: translateY(-50%); border-top: 6px solid transparent; border-bottom: 6px solid transparent; border-right: 6px solid #1a1a1a; }
   @keyframes hintFadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
   .photo-hint.hide { animation: hintFadeOut 0.3s ease forwards; }
   @keyframes hintFadeOut { to { opacity: 0; transform: translateY(-4px); } }
