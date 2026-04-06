@@ -2154,6 +2154,7 @@ ADMIN_HTML = r"""<!DOCTYPE html>
   .admin-tab:hover:not(.active) { color: #666; }
   .admin-panel { display: none; }
   .admin-panel.active { display: block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
 
   .invite-link-cell { display: flex; align-items: center; gap: 6px; }
   .invite-url { font-size: 11px; color: #777; word-break: break-all; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: #faf9f7; padding: 6px 8px; border-radius: 8px; border: 1px solid #e8e6e3; font-family: monospace; }
@@ -2233,7 +2234,7 @@ ADMIN_HTML = r"""<!DOCTYPE html>
     <div class="card">
       <h3>&#128279; Walk-up Invite Links</h3>
       <p style="color:#999;font-size:13px;margin-bottom:14px">Generate a unique link per person. They open it, type their name, and are auto-approved. Generate a new one for each person.</p>
-      <button onclick="generateWalkupLink()" style="padding:9px 18px;background:#222;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:14px">+ Generate New Link</button>
+      <button id="walkup-gen-btn" onclick="generateWalkupLink()" style="padding:9px 18px;background:#222;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:14px">+ Generate New Link</button>
       <div id="walkup-links-list"></div>
     </div>
 
@@ -2432,11 +2433,16 @@ ADMIN_HTML = r"""<!DOCTYPE html>
   }
 
   async function generateWalkupLink() {
+    const btn = document.getElementById('walkup-gen-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span style="display:inline-block;animation:spin 0.7s linear infinite">⟳</span> Generating...';
     try {
       const res = await fetch('/api/admin/open-invites', { method: 'POST' });
       const data = await res.json();
       if (data.token) loadWalkupLinks();
     } catch(e) { showToast('Failed to generate link'); }
+    btn.disabled = false;
+    btn.innerHTML = '+ Generate New Link';
   }
 
   function copyOneWalkupLink(url, btn) {
