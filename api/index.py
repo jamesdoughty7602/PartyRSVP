@@ -846,7 +846,7 @@ MAIN_HTML = r"""<!DOCTYPE html>
 <title>HOUSE PARTY V2</title>
 <meta property="og:title" content="HOUSE PARTY V2 🎉">
 <meta property="og:description" content="You're invited! RSVP for the house party hosted by Krish & James.">
-<meta property="og:image" content="https://meta-invites.vercel.app/og-image.png">
+<meta property="og:image" content="https://partyrsvp.vercel.app/og-image.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:type" content="website">
