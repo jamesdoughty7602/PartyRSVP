@@ -135,6 +135,11 @@ def init_db():
         conn.commit()
     except Exception:
         conn.rollback()
+    try:
+        cur.execute("ALTER TABLE rsvps ADD COLUMN source_token TEXT DEFAULT ''")
+        conn.commit()
+    except Exception:
+        conn.rollback()
     # Backfill invite tokens for guests that don't have one
     cur.execute("SELECT id FROM guest_list WHERE invite_token IS NULL")
     for row in cur.fetchall():
@@ -220,7 +225,7 @@ def rsvp_page():
 def api_rsvps():
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("SELECT name, status, instagram, facebook, profile_pic, updated_at FROM rsvps WHERE approved = 1 ORDER BY updated_at DESC")
+    cur.execute("SELECT name, status, instagram, facebook, profile_pic, updated_at FROM rsvps WHERE approved = 1 ORDER BY name ASC")
     rows = cur.fetchall()
     cur.execute("SELECT name, created_at FROM plus_ones WHERE approved = 1 ORDER BY created_at DESC")
     plus_ones = cur.fetchall()
@@ -399,9 +404,12 @@ def api_rsvp():
     cur.execute("SELECT id FROM rsvps WHERE LOWER(name) = LOWER(%s)", (name,))
     existing = cur.fetchone()
     if existing:
-        cur.execute("UPDATE rsvps SET status = %s, approved = %s, instagram = %s, facebook = %s, updated_at = NOW() WHERE id = %s", (status, approved, instagram, facebook, existing["id"]))
+        if open_invite_token:
+            cur.execute("UPDATE rsvps SET status = %s, approved = %s, instagram = %s, facebook = %s, source_token = %s, updated_at = NOW() WHERE id = %s", (status, approved, instagram, facebook, open_invite_token, existing["id"]))
+        else:
+            cur.execute("UPDATE rsvps SET status = %s, approved = %s, instagram = %s, facebook = %s, updated_at = NOW() WHERE id = %s", (status, approved, instagram, facebook, existing["id"]))
     else:
-        cur.execute("INSERT INTO rsvps (name, status, approved, instagram, facebook) VALUES (%s, %s, %s, %s, %s)", (name, status, approved, instagram, facebook))
+        cur.execute("INSERT INTO rsvps (name, status, approved, instagram, facebook, source_token) VALUES (%s, %s, %s, %s, %s, %s)", (name, status, approved, instagram, facebook, open_invite_token))
     conn.commit()
     conn.close()
 
@@ -907,7 +915,13 @@ def api_admin_get_open_invites():
         return jsonify({"error": "Unauthorized"}), 401
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("SELECT id, token, created_at FROM open_invites ORDER BY created_at DESC")
+    cur.execute("""
+        SELECT oi.id, oi.token, oi.created_at,
+               COALESCE(r.name, oi.used_by, '') AS used_by
+        FROM open_invites oi
+        LEFT JOIN rsvps r ON r.source_token = oi.token
+        ORDER BY oi.created_at DESC
+    """)
     rows = cur.fetchall()
     conn.close()
     for r in rows:
