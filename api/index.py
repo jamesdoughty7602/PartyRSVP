@@ -993,10 +993,15 @@ MAIN_HTML = r"""<!DOCTYPE html>
   input[type="text"]::placeholder { color: #bbb; }
 
   .returning-name { font-family: 'DM Serif Display', Georgia, serif; font-size: 28px; font-weight: 400; color: #1a1a1a; padding: 8px 0; }
-  .returning-name-row { display: flex; align-items: center; gap: 16px; }
+  .returning-name-row { display: flex; align-items: center; gap: 16px; position: relative; }
   .profile-photo-upload { width: 60px; height: 60px; border-radius: 50%; border: 2px dashed #ccc; display: flex; align-items: center; justify-content: center; cursor: pointer; overflow: hidden; flex-shrink: 0; transition: border-color 0.2s; }
   .profile-photo-upload:hover { border-color: #999; }
   .profile-photo-upload img { width: 100%; height: 100%; object-fit: cover; }
+  .photo-hint { position: absolute; left: 0; top: 72px; background: #1a1a1a; color: #fff; font-size: 12px; font-family: 'DM Sans', sans-serif; padding: 6px 10px; border-radius: 8px; white-space: nowrap; pointer-events: none; animation: hintFadeIn 0.4s ease forwards; z-index: 10; }
+  .photo-hint::before { content: ''; position: absolute; top: -6px; left: 22px; border-left: 6px solid transparent; border-right: 6px solid transparent; border-bottom: 6px solid #1a1a1a; }
+  @keyframes hintFadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+  .photo-hint.hide { animation: hintFadeOut 0.3s ease forwards; }
+  @keyframes hintFadeOut { to { opacity: 0; transform: translateY(-4px); } }
 
   /* Plus Ones */
   .add-plusone-form { display: flex; gap: 10px; margin-bottom: 20px; }
@@ -1318,7 +1323,10 @@ MAIN_HTML = r"""<!DOCTYPE html>
     if (!name) return;
     const nameGroup = document.getElementById('name-group');
     const cameraSvg = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>';
-    nameGroup.innerHTML = '<div class="returning-name-row"><div class="profile-photo-upload" id="profile-photo-circle" onclick="document.getElementById(\'profile-photo-input\').click()">' + cameraSvg + '</div><div class="returning-name">' + escapeHtml(name) + '</div></div><input type="file" id="profile-photo-input" accept="image/*" style="display:none" onchange="handleProfilePhoto(this)">';
+    nameGroup.innerHTML = '<div class="returning-name-row"><div class="profile-photo-upload" id="profile-photo-circle" onclick="document.getElementById(\'profile-photo-input\').click()">' + cameraSvg + '</div><div class="returning-name">' + escapeHtml(name) + '</div><div class="photo-hint" id="photo-hint">📸 Add a profile pic!</div></div><input type="file" id="profile-photo-input" accept="image/*" style="display:none" onchange="handleProfilePhoto(this)">';
+    const dismissHint = () => { const h = document.getElementById('photo-hint'); if (h) { h.classList.add('hide'); setTimeout(() => h.remove(), 300); } };
+    setTimeout(dismissHint, 5000);
+    document.getElementById('profile-photo-circle').addEventListener('click', dismissHint, { once: true });
     const hidden = document.createElement('input');
     hidden.type = 'hidden';
     hidden.id = 'name-input';
@@ -1333,6 +1341,8 @@ MAIN_HTML = r"""<!DOCTYPE html>
           circle.innerHTML = '<img src="' + data.profile_pic + '" alt="Profile">';
           circle.style.borderStyle = 'solid';
           circle.style.borderColor = '#e8e6e3';
+          const hint = document.getElementById('photo-hint');
+          if (hint) hint.remove();
         }
         const area = document.getElementById('status-area');
         if (data.status && data.approved === 1) {
