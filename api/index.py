@@ -210,7 +210,7 @@ def rsvp_page():
             html = MAIN_HTML.replace('<head>', '<head>' + prefill_script, 1)
             return make_response(html, 200, {"Content-Type": "text/html; charset=utf-8"})
         if open_inv:
-            walkup_script = f'<script>window.__OPEN_INVITE_TOKEN={json.dumps(invite_token)};var _prev=localStorage.getItem("krish_james_party_v2_token");if(_prev!={json.dumps(invite_token)}){{localStorage.removeItem("krish_james_party_v2_name");}}localStorage.setItem("krish_james_party_v2_token",{json.dumps(invite_token)});</script>'
+            walkup_script = f'<script>var _prev=localStorage.getItem("krish_james_party_v2_token");if(_prev!={json.dumps(invite_token)}){{localStorage.removeItem("krish_james_party_v2_name");}}localStorage.setItem("krish_james_party_v2_token",{json.dumps(invite_token)});localStorage.setItem("krish_james_party_v2_walkup",{json.dumps(invite_token)});</script>'
             html = MAIN_HTML.replace('<head>', '<head>' + walkup_script, 1)
             return make_response(html, 200, {"Content-Type": "text/html; charset=utf-8"})
     return make_response(MAIN_HTML, 200, {"Content-Type": "text/html; charset=utf-8"})
@@ -1737,7 +1737,7 @@ MAIN_HTML = r"""<!DOCTYPE html>
     fetch('/api/rsvp', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, status, open_invite_token: (() => { const t = window.__OPEN_INVITE_TOKEN || localStorage.getItem('krish_james_party_v2_token') || ''; return t.startsWith('wu_') ? t : ''; })() })
+      body: JSON.stringify({ name, status, open_invite_token: localStorage.getItem('krish_james_party_v2_walkup') || '' })
     }).then(res => res.json().then(data => {
       if (!res.ok) {
         errEl.textContent = data.error || 'Something went wrong';
