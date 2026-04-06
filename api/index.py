@@ -1003,6 +1003,19 @@ MAIN_HTML = r"""<!DOCTYPE html>
   .photo-hint.hide { animation: hintFadeOut 0.3s ease forwards; }
   @keyframes hintFadeOut { to { opacity: 0; transform: translateY(-4px); } }
 
+  /* Instagram in-app browser popup */
+  .iab-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 9999; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 32px; animation: overlayIn 0.25s ease; }
+  @keyframes overlayIn { from { opacity: 0; } to { opacity: 1; } }
+  .iab-overlay.hide { animation: overlayOut 0.25s ease forwards; }
+  @keyframes overlayOut { to { opacity: 0; } }
+  .iab-card { background: #fff; border-radius: 20px; padding: 28px 24px 20px; width: calc(100% - 48px); max-width: 380px; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.25); animation: cardIn 0.3s cubic-bezier(0.175,0.885,0.32,1.275); }
+  @keyframes cardIn { from { opacity: 0; transform: translateY(40px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
+  .iab-icon { font-size: 44px; margin-bottom: 12px; }
+  .iab-title { font-family: 'DM Serif Display', Georgia, serif; font-size: 20px; font-weight: 400; color: #1a1a1a; margin-bottom: 8px; }
+  .iab-msg { font-size: 14px; color: #777; line-height: 1.5; margin-bottom: 22px; }
+  .iab-open-btn { display: block; width: 100%; padding: 14px; background: #1a1a1a; color: #fff; border: none; border-radius: 14px; font-size: 16px; font-weight: 600; cursor: pointer; margin-bottom: 10px; font-family: 'DM Sans', sans-serif; }
+  .iab-dismiss { font-size: 14px; color: #aaa; cursor: pointer; padding: 6px; display: block; }
+
   /* Plus Ones */
   .add-plusone-form { display: flex; gap: 10px; margin-bottom: 20px; }
   .add-plusone-form input { flex: 1; padding: 14px 16px; font-family: 'DM Sans', sans-serif; font-size: 15px; border: 2px solid #e8e6e3; border-radius: 14px; background: #faf9f7; outline: none; transition: border-color 0.2s; }
@@ -1880,6 +1893,16 @@ MAIN_HTML = r"""<!DOCTYPE html>
     refreshMyStatus();
   }
   loadAnnouncements();
+
+  // Show "Open in Safari" popup when inside Instagram in-app browser
+  if (/Instagram/.test(navigator.userAgent)) {
+    const overlay = document.createElement('div');
+    overlay.className = 'iab-overlay';
+    const safariUrl = window.location.href.replace(/^https?:\/\//, match => 'x-safari-' + match);
+    overlay.innerHTML = '<div class="iab-card"><div class="iab-icon">🧭</div><div class="iab-title">Open in Safari</div><div class="iab-msg">For the best experience — including adding a profile pic and RSVP\'ing — open this in Safari.</div><button class="iab-open-btn" onclick="window.location.href=\'' + safariUrl + '\'">Open in Safari ↗</button><span class="iab-dismiss" onclick="this.closest(\'.iab-overlay\').classList.add(\'hide\');setTimeout(()=>this.closest(\'.iab-overlay\').remove(),250)">Continue in Instagram</span></div>';
+    overlay.addEventListener('click', function(e) { if (e.target === overlay) { overlay.classList.add('hide'); setTimeout(() => overlay.remove(), 250); } });
+    document.body.appendChild(overlay);
+  }
 
 </script>
 </body>
