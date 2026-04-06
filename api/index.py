@@ -111,6 +111,13 @@ def init_db():
         EXCEPTION WHEN duplicate_table THEN NULL;
         END $$;
     """)
+    cur.execute("""CREATE TABLE IF NOT EXISTS announcement_reactions (
+        id SERIAL PRIMARY KEY,
+        announcement_id INTEGER NOT NULL,
+        invite_token TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE(announcement_id, invite_token)
+    )""")
     conn.commit()
     try:
         cur.execute("ALTER TABLE announcements ADD COLUMN photo TEXT DEFAULT ''")
@@ -747,14 +754,45 @@ def api_admin_delete_plus_one():
 
 @app.route("/api/announcements")
 def api_announcements():
+    token = request.args.get("token", "")
     conn = get_db()
     cur = conn.cursor()
     cur.execute("SELECT id, message, photo, created_at FROM announcements ORDER BY created_at DESC")
     rows = cur.fetchall()
-    conn.close()
     for r in rows:
         r["created_at"] = (str(r["created_at"]) + "+00:00") if r["created_at"] else ""
+        cur.execute("SELECT COUNT(*) as cnt FROM announcement_reactions WHERE announcement_id = %s", (r["id"],))
+        r["reaction_count"] = cur.fetchone()["cnt"]
+        r["user_reacted"] = False
+        if token:
+            cur.execute("SELECT 1 FROM announcement_reactions WHERE announcement_id = %s AND invite_token = %s", (r["id"], token))
+            r["user_reacted"] = cur.fetchone() is not None
+    conn.close()
     return jsonify({"announcements": rows})
+
+
+@app.route("/api/react", methods=["POST"])
+def api_react():
+    body = request.get_json(force=True)
+    token = body.get("token", "").strip()
+    announcement_id = body.get("announcement_id")
+    if not token or not announcement_id:
+        return jsonify({"error": "missing fields"}), 400
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT 1 FROM announcement_reactions WHERE announcement_id = %s AND invite_token = %s", (announcement_id, token))
+    already = cur.fetchone()
+    if already:
+        cur.execute("DELETE FROM announcement_reactions WHERE announcement_id = %s AND invite_token = %s", (announcement_id, token))
+        reacted = False
+    else:
+        cur.execute("INSERT INTO announcement_reactions (announcement_id, invite_token) VALUES (%s, %s)", (announcement_id, token))
+        reacted = True
+    conn.commit()
+    cur.execute("SELECT COUNT(*) as cnt FROM announcement_reactions WHERE announcement_id = %s", (announcement_id,))
+    count = cur.fetchone()["cnt"]
+    conn.close()
+    return jsonify({"reacted": reacted, "count": count})
 
 
 @app.route("/api/mark-seen", methods=["POST"])
@@ -1015,6 +1053,15 @@ MAIN_HTML = r"""<!DOCTYPE html>
   .iab-msg { font-size: 14px; color: #777; line-height: 1.5; margin-bottom: 22px; }
   .iab-open-btn { display: block; width: 100%; padding: 14px; background: #1a1a1a; color: #fff; border: none; border-radius: 14px; font-size: 16px; font-weight: 600; cursor: pointer; margin-bottom: 10px; font-family: 'DM Sans', sans-serif; }
   .iab-dismiss { font-size: 14px; color: #aaa; cursor: pointer; padding: 6px; display: block; }
+
+  /* Announcement reactions */
+  .react-btn { display: flex; align-items: center; gap: 4px; background: none; border: 1.5px solid #eee; border-radius: 20px; padding: 4px 10px; cursor: pointer; font-size: 13px; color: #bbb; transition: all 0.15s ease; }
+  .react-btn:hover { border-color: #ff6b9d; color: #ff6b9d; }
+  .react-btn.reacted { border-color: #ff6b9d; color: #ff6b9d; background: #fff0f5; }
+  .react-btn.reacted .react-heart { animation: heartPop 0.3s cubic-bezier(0.175,0.885,0.32,1.275); }
+  .react-heart { font-size: 15px; line-height: 1; }
+  .react-count { font-size: 12px; font-weight: 600; min-width: 8px; }
+  @keyframes heartPop { 0% { transform: scale(1); } 50% { transform: scale(1.4); } 100% { transform: scale(1); } }
 
   /* Plus Ones */
   .add-plusone-form { display: flex; gap: 10px; margin-bottom: 20px; }
@@ -1853,9 +1900,23 @@ MAIN_HTML = r"""<!DOCTYPE html>
     if (e.key === 'Enter') { e.preventDefault(); addPlusOne(); }
   });
 
+  async function toggleReact(announcementId, btn) {
+    const token = localStorage.getItem('krish_james_party_v2_token');
+    if (!token) return;
+    btn.disabled = true;
+    try {
+      const res = await fetch('/api/react', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({token, announcement_id: announcementId}) });
+      const data = await res.json();
+      btn.classList.toggle('reacted', data.reacted);
+      btn.querySelector('.react-count').textContent = data.count > 0 ? data.count : '';
+    } catch(e) {}
+    btn.disabled = false;
+  }
+
   async function loadAnnouncements() {
     try {
-      const res = await fetch('/api/announcements');
+      const token = localStorage.getItem('krish_james_party_v2_token');
+      const res = await fetch('/api/announcements' + (token ? '?token=' + encodeURIComponent(token) : ''));
       const data = await res.json();
       const list = document.getElementById('announcements-list');
       const section = document.getElementById('announcements-section');
@@ -1870,10 +1931,11 @@ MAIN_HTML = r"""<!DOCTYPE html>
           const timeStr = months[d.getMonth()] + ' ' + d.getDate() + ' at ' + h12 + ':' + (m < 10 ? '0' : '') + m + ' ' + ampm;
           const isVideo = a.photo && (a.photo.startsWith('data:video/') || a.photo.match(/\.(mp4|mov|webm)$/i));
           const mediaHtml = a.photo ? (isVideo ? '<div style="margin-top:8px"><video src="' + a.photo + '" controls playsinline style="max-width:100%;border-radius:10px"></video></div>' : '<div style="margin-top:8px"><img src="' + a.photo + '" style="max-width:100%;border-radius:10px"></div>') : '';
-          return '<div style="background:#fff;border-radius:14px;padding:16px 18px;margin-bottom:12px;border:1px solid #eee;box-shadow:0 2px 8px rgba(0,0,0,0.04)">' + mediaHtml + (a.message ? '<div style="font-size:14px;line-height:1.5;color:#333;word-break:break-word;overflow-wrap:break-word">' + escapeHtml(a.message) + '</div>' : '') + '<div style="font-size:11px;color:#aaa;margin-top:8px">' + timeStr + '</div></div>';
+          const reactedClass = a.user_reacted ? ' reacted' : '';
+          const reactCount = a.reaction_count > 0 ? a.reaction_count : '';
+          const reactBtn = token ? '<button class="react-btn' + reactedClass + '" onclick="toggleReact(' + a.id + ', this)"><span class="react-heart">♥</span><span class="react-count">' + reactCount + '</span></button>' : '';
+          return '<div style="background:#fff;border-radius:14px;padding:16px 18px;margin-bottom:12px;border:1px solid #eee;box-shadow:0 2px 8px rgba(0,0,0,0.04)">' + mediaHtml + (a.message ? '<div style="font-size:14px;line-height:1.5;color:#333;word-break:break-word;overflow-wrap:break-word">' + escapeHtml(a.message) + '</div>' : '') + '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px"><div style="font-size:11px;color:#aaa">' + timeStr + '</div>' + reactBtn + '</div></div>';
         }).join('');
-        // Mark announcements as seen if guest has an invite token
-        const token = localStorage.getItem('krish_james_party_v2_token');
         if (token && data.announcements.length > 0) {
           fetch('/api/mark-seen', {
             method: 'POST',
