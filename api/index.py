@@ -1343,7 +1343,7 @@ MAIN_HTML = r"""<!DOCTYPE html>
   })();
 
   const STORAGE_KEY = 'krish_james_party_v2_name';
-  function getName() { return window.__INVITE_NAME || getName(); }
+  function getName() { return window.__INVITE_NAME || localStorage.getItem(STORAGE_KEY) || ''; }
   const LETTER_COLORS = {A:'#E74C3C',B:'#E67E22',C:'#F1C40F',D:'#2ECC71',E:'#1ABC9C',F:'#3498DB',G:'#9B59B6',H:'#E91E63',I:'#FF5722',J:'#FF9800',K:'#8BC34A',L:'#00BCD4',M:'#673AB7',N:'#F06292',O:'#D32F2F',P:'#FF7043',Q:'#CDDC39',R:'#26A69A',S:'#42A5F5',T:'#7E57C2',U:'#EC407A',V:'#FF8A65',W:'#66BB6A',X:'#FFD700',Y:'#29B6F6',Z:'#AB47BC'};
   const STATUS_LABELS = { going: 'Going', maybe: 'Maybe', cant_go: "Can't Go" };
   const STATUS_EMOJI = { going: '&#127881;', maybe: '&#129300;', cant_go: '&#128532;' };
@@ -2177,6 +2177,15 @@ ADMIN_HTML = r"""<!DOCTYPE html>
     </div>
 
     <div class="card">
+      <h3>&#128279; Walk-up Invite Link</h3>
+      <p style="color:#999;font-size:13px;margin-bottom:14px">Share this with anyone you meet — they can type their own name and RSVP.</p>
+      <div style="display:flex;align-items:center;gap:8px;background:#faf9f7;border:1px solid #e8e6e3;border-radius:10px;padding:10px 12px">
+        <span id="walkup-url" style="font-size:12px;color:#777;flex:1;font-family:monospace;word-break:break-all"></span>
+        <button id="walkup-copy-btn" onclick="copyWalkupLink()" style="padding:6px 14px;background:#222;color:#fff;border:none;border-radius:8px;font-size:12px;cursor:pointer;white-space:nowrap;font-weight:600">Copy</button>
+      </div>
+    </div>
+
+    <div class="card">
       <h3>&#128226; Announcements</h3>
       <p style="color:#999;font-size:13px;margin-bottom:16px">Post updates that all guests will see on their RSVP page</p>
       <div style="display:flex;gap:8px;margin-bottom:8px">
@@ -2318,6 +2327,17 @@ ADMIN_HTML = r"""<!DOCTYPE html>
     }
 
     renderAnnouncements();
+    const walkupUrl = window.location.origin + '/rsvp';
+    const urlEl = document.getElementById('walkup-url');
+    if (urlEl) urlEl.textContent = walkupUrl;
+  }
+
+  function copyWalkupLink() {
+    const url = window.location.origin + '/rsvp';
+    navigator.clipboard.writeText(url).then(() => {
+      const btn = document.getElementById('walkup-copy-btn');
+      if (btn) { btn.textContent = 'Copied!'; setTimeout(() => { btn.textContent = 'Copy'; }, 2000); }
+    });
   }
 
   function statusLabel(s) {
