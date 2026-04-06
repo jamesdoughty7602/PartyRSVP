@@ -121,11 +121,17 @@ def init_db():
     cur.execute("""CREATE TABLE IF NOT EXISTS open_invites (
         id SERIAL PRIMARY KEY,
         token TEXT UNIQUE NOT NULL,
+        used_by TEXT DEFAULT '',
         created_at TIMESTAMP DEFAULT NOW()
     )""")
     conn.commit()
     try:
         cur.execute("ALTER TABLE announcements ADD COLUMN photo TEXT DEFAULT ''")
+        conn.commit()
+    except Exception:
+        conn.rollback()
+    try:
+        cur.execute("ALTER TABLE open_invites ADD COLUMN used_by TEXT DEFAULT ''")
         conn.commit()
     except Exception:
         conn.rollback()
@@ -386,6 +392,8 @@ def api_rsvp():
     if open_invite_token:
         cur.execute("SELECT 1 FROM open_invites WHERE token = %s", (open_invite_token,))
         is_walkup = cur.fetchone() is not None
+        if is_walkup:
+            cur.execute("UPDATE open_invites SET used_by = %s WHERE token = %s", (name, open_invite_token))
     approved = 1 if (on_list or is_approved_plus_one or is_walkup) else 0
 
     cur.execute("SELECT id FROM rsvps WHERE LOWER(name) = LOWER(%s)", (name,))
@@ -2413,10 +2421,10 @@ ADMIN_HTML = r"""<!DOCTYPE html>
     if (!tokens.length) { list.innerHTML = '<div style="font-size:13px;color:#bbb">No links generated yet.</div>'; return; }
     list.innerHTML = tokens.map(t => {
       const url = window.location.origin + '/rsvp?invite=' + t.token;
-      const shortToken = t.token.slice(-8);
-      return '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #f0eeeb">'
-        + '<span style="font-size:12px;color:#aaa;font-family:monospace;flex:0 0 auto">···' + shortToken + '</span>'
-        + '<span style="font-size:12px;color:#777;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:monospace">' + url + '</span>'
+      const usedBy = t.used_by ? '<span style="font-size:12px;font-weight:600;color:#27ae60;flex-shrink:0">✓ ' + esc(t.used_by) + '</span>' : '<span style="font-size:12px;color:#bbb;flex-shrink:0">Unused</span>';
+      return '<div style="display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid #f0eeeb">'
+        + usedBy
+        + '<span style="font-size:11px;color:#ccc;font-family:monospace;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">···' + t.token.slice(-10) + '</span>'
         + '<button onclick="copyOneWalkupLink(\'' + url + '\', this)" style="padding:4px 10px;background:#222;color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer;white-space:nowrap;flex-shrink:0">Copy</button>'
         + '<button onclick="deleteWalkupLink(' + t.id + ', this)" style="padding:4px 8px;background:none;border:none;color:#c0392b;font-size:16px;cursor:pointer;flex-shrink:0" title="Delete">&times;</button>'
         + '</div>';
