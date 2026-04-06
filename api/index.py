@@ -118,6 +118,11 @@ def init_db():
         created_at TIMESTAMP DEFAULT NOW(),
         UNIQUE(announcement_id, invite_token)
     )""")
+    cur.execute("""CREATE TABLE IF NOT EXISTS open_invites (
+        id SERIAL PRIMARY KEY,
+        token TEXT UNIQUE NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW()
+    )""")
     conn.commit()
     try:
         cur.execute("ALTER TABLE announcements ADD COLUMN photo TEXT DEFAULT ''")
@@ -188,10 +193,19 @@ def rsvp_page():
         if not guest:
             cur.execute("SELECT name FROM plus_ones WHERE invite_token = %s AND approved = 1", (invite_token,))
             guest = cur.fetchone()
+        if not guest:
+            cur.execute("SELECT token FROM open_invites WHERE token = %s", (invite_token,))
+            open_inv = cur.fetchone()
+        else:
+            open_inv = None
         conn.close()
         if guest:
             prefill_script = f'<script>window.__INVITE_NAME={json.dumps(guest["name"])};window.__INVITE_TOKEN={json.dumps(invite_token)};localStorage.setItem("krish_james_party_v2_name",window.__INVITE_NAME);localStorage.setItem("krish_james_party_v2_token",window.__INVITE_TOKEN);</script>'
             html = MAIN_HTML.replace('<head>', '<head>' + prefill_script, 1)
+            return make_response(html, 200, {"Content-Type": "text/html; charset=utf-8"})
+        if open_inv:
+            walkup_script = f'<script>window.__OPEN_INVITE_TOKEN={json.dumps(invite_token)};localStorage.setItem("krish_james_party_v2_token",{json.dumps(invite_token)});</script>'
+            html = MAIN_HTML.replace('<head>', '<head>' + walkup_script, 1)
             return make_response(html, 200, {"Content-Type": "text/html; charset=utf-8"})
     return make_response(MAIN_HTML, 200, {"Content-Type": "text/html; charset=utf-8"})
 
@@ -361,13 +375,18 @@ def api_rsvp():
     if status not in ("going", "maybe", "cant_go"):
         return jsonify({"error": "Invalid status"}), 400
 
+    open_invite_token = body.get("open_invite_token", "").strip()
     conn = get_db()
     cur = conn.cursor()
     cur.execute("SELECT 1 FROM guest_list WHERE LOWER(name) = LOWER(%s)", (name,))
     on_list = cur.fetchone()
     cur.execute("SELECT 1 FROM plus_ones WHERE LOWER(name) = LOWER(%s) AND approved = 1", (name,))
     is_approved_plus_one = cur.fetchone()
-    approved = 1 if (on_list or is_approved_plus_one) else 0
+    is_walkup = False
+    if open_invite_token:
+        cur.execute("SELECT 1 FROM open_invites WHERE token = %s", (open_invite_token,))
+        is_walkup = cur.fetchone() is not None
+    approved = 1 if (on_list or is_approved_plus_one or is_walkup) else 0
 
     cur.execute("SELECT id FROM rsvps WHERE LOWER(name) = LOWER(%s)", (name,))
     existing = cur.fetchone()
@@ -869,6 +888,46 @@ def api_admin_delete_announcement():
     conn = get_db()
     cur = conn.cursor()
     cur.execute("DELETE FROM announcements WHERE id = %s", (ann_id,))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/admin/open-invites", methods=["GET"])
+def api_admin_get_open_invites():
+    if not check_admin():
+        return jsonify({"error": "Unauthorized"}), 401
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT id, token, created_at FROM open_invites ORDER BY created_at DESC")
+    rows = cur.fetchall()
+    conn.close()
+    for r in rows:
+        r["created_at"] = str(r["created_at"])
+    return jsonify({"tokens": rows})
+
+
+@app.route("/api/admin/open-invites", methods=["POST"])
+def api_admin_create_open_invite():
+    if not check_admin():
+        return jsonify({"error": "Unauthorized"}), 401
+    import secrets as _sec
+    token = "wu_" + _sec.token_urlsafe(16)
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("INSERT INTO open_invites (token) VALUES (%s)", (token,))
+    conn.commit()
+    conn.close()
+    return jsonify({"token": token})
+
+
+@app.route("/api/admin/open-invites/<int:invite_id>", methods=["DELETE"])
+def api_admin_delete_open_invite(invite_id):
+    if not check_admin():
+        return jsonify({"error": "Unauthorized"}), 401
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM open_invites WHERE id = %s", (invite_id,))
     conn.commit()
     conn.close()
     return jsonify({"ok": True})
@@ -1670,7 +1729,7 @@ MAIN_HTML = r"""<!DOCTYPE html>
     fetch('/api/rsvp', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, status })
+      body: JSON.stringify({ name, status, open_invite_token: window.__OPEN_INVITE_TOKEN || '' })
     }).then(res => res.json().then(data => {
       if (!res.ok) {
         errEl.textContent = data.error || 'Something went wrong';
@@ -2162,6 +2221,14 @@ ADMIN_HTML = r"""<!DOCTYPE html>
 
   <!-- MANAGE TAB -->
   <div class="admin-panel active" id="panel-manage">
+
+    <div class="card">
+      <h3>&#128279; Walk-up Invite Links</h3>
+      <p style="color:#999;font-size:13px;margin-bottom:14px">Generate a unique link per person. They open it, type their name, and are auto-approved. Generate a new one for each person.</p>
+      <button onclick="generateWalkupLink()" style="padding:9px 18px;background:#222;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:14px">+ Generate New Link</button>
+      <div id="walkup-links-list"></div>
+    </div>
+
     <div class="card">
       <h2>&#128203; Approved Guest List</h2>
       <div class="add-form">
@@ -2327,17 +2394,56 @@ ADMIN_HTML = r"""<!DOCTYPE html>
     }
 
     renderAnnouncements();
-    const walkupUrl = window.location.origin + '/rsvp';
-    const urlEl = document.getElementById('walkup-url');
-    if (urlEl) urlEl.textContent = walkupUrl;
+    loadWalkupLinks();
   }
 
-  function copyWalkupLink() {
-    const url = window.location.origin + '/rsvp';
+  async function loadWalkupLinks() {
+    const list = document.getElementById('walkup-links-list');
+    if (!list) return;
+    try {
+      const res = await fetch('/api/admin/open-invites');
+      const data = await res.json();
+      renderWalkupLinks(data.tokens || []);
+    } catch(e) {}
+  }
+
+  function renderWalkupLinks(tokens) {
+    const list = document.getElementById('walkup-links-list');
+    if (!list) return;
+    if (!tokens.length) { list.innerHTML = '<div style="font-size:13px;color:#bbb">No links generated yet.</div>'; return; }
+    list.innerHTML = tokens.map(t => {
+      const url = window.location.origin + '/rsvp?invite=' + t.token;
+      const shortToken = t.token.slice(-8);
+      return '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #f0eeeb">'
+        + '<span style="font-size:12px;color:#aaa;font-family:monospace;flex:0 0 auto">···' + shortToken + '</span>'
+        + '<span style="font-size:12px;color:#777;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:monospace">' + url + '</span>'
+        + '<button onclick="copyOneWalkupLink(\'' + url + '\', this)" style="padding:4px 10px;background:#222;color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer;white-space:nowrap;flex-shrink:0">Copy</button>'
+        + '<button onclick="deleteWalkupLink(' + t.id + ', this)" style="padding:4px 8px;background:none;border:none;color:#c0392b;font-size:16px;cursor:pointer;flex-shrink:0" title="Delete">&times;</button>'
+        + '</div>';
+    }).join('');
+  }
+
+  async function generateWalkupLink() {
+    try {
+      const res = await fetch('/api/admin/open-invites', { method: 'POST' });
+      const data = await res.json();
+      if (data.token) loadWalkupLinks();
+    } catch(e) { showToast('Failed to generate link'); }
+  }
+
+  function copyOneWalkupLink(url, btn) {
     navigator.clipboard.writeText(url).then(() => {
-      const btn = document.getElementById('walkup-copy-btn');
-      if (btn) { btn.textContent = 'Copied!'; setTimeout(() => { btn.textContent = 'Copy'; }, 2000); }
+      btn.textContent = 'Copied!';
+      setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
     });
+  }
+
+  async function deleteWalkupLink(id, btn) {
+    if (!confirm('Delete this walk-up link?')) return;
+    try {
+      await fetch('/api/admin/open-invites/' + id, { method: 'DELETE' });
+      loadWalkupLinks();
+    } catch(e) { showToast('Failed to delete'); }
   }
 
   function statusLabel(s) {
