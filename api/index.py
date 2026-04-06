@@ -984,7 +984,7 @@ MAIN_HTML = r"""<!DOCTYPE html>
     background-clip: text;
     filter: drop-shadow(0 0 12px rgba(196, 77, 255, 0.4));
   }
-  .rsvp-intro p { color: #777; font-size: 15px; line-height: 1.5; }
+  .rsvp-intro p { color: #777; font-size: 13px; line-height: 1.5; }
 
   .form-group { margin-bottom: 20px; }
   label { display: block; font-size: 13px; font-weight: 600; color: #555; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
