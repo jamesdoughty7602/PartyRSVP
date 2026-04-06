@@ -1325,7 +1325,6 @@ MAIN_HTML = r"""<!DOCTYPE html>
     const cameraSvg = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>';
     nameGroup.innerHTML = '<div class="returning-name-row"><div class="profile-photo-upload" id="profile-photo-circle" onclick="document.getElementById(\'profile-photo-input\').click()">' + cameraSvg + '</div><div class="returning-name">' + escapeHtml(name) + '</div><div class="photo-hint" id="photo-hint">📸 Add a profile pic!</div></div><input type="file" id="profile-photo-input" accept="image/*" style="display:none" onchange="handleProfilePhoto(this)">';
     const dismissHint = () => { const h = document.getElementById('photo-hint'); if (h) { h.classList.add('hide'); setTimeout(() => h.remove(), 300); } };
-    setTimeout(dismissHint, 5000);
     document.getElementById('profile-photo-circle').addEventListener('click', dismissHint, { once: true });
     const hidden = document.createElement('input');
     hidden.type = 'hidden';
