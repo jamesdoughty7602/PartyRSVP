@@ -1737,7 +1737,7 @@ MAIN_HTML = r"""<!DOCTYPE html>
     fetch('/api/rsvp', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, status, open_invite_token: window.__OPEN_INVITE_TOKEN || '' })
+      body: JSON.stringify({ name, status, open_invite_token: (() => { const t = window.__OPEN_INVITE_TOKEN || localStorage.getItem('krish_james_party_v2_token') || ''; return t.startsWith('wu_') ? t : ''; })() })
     }).then(res => res.json().then(data => {
       if (!res.ok) {
         errEl.textContent = data.error || 'Something went wrong';
