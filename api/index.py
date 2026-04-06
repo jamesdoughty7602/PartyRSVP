@@ -1898,8 +1898,8 @@ MAIN_HTML = r"""<!DOCTYPE html>
   if (/Instagram/.test(navigator.userAgent)) {
     const overlay = document.createElement('div');
     overlay.className = 'iab-overlay';
-    const safariUrl = window.location.href.replace(/^https?:\/\//, match => 'x-safari-' + match);
-    overlay.innerHTML = '<div class="iab-card"><div class="iab-icon">🧭</div><div class="iab-title">Open in Safari</div><div class="iab-msg">For the best experience — including adding a profile pic and RSVP\'ing — open this in Safari.</div><button class="iab-open-btn" onclick="window.location.href=\'' + safariUrl + '\'">Open in Safari ↗</button><span class="iab-dismiss" onclick="this.closest(\'.iab-overlay\').classList.add(\'hide\');setTimeout(()=>this.closest(\'.iab-overlay\').remove(),250)">Continue in Instagram</span></div>';
+    const currentUrl = window.location.href;
+    overlay.innerHTML = '<div class="iab-card"><div class="iab-icon">🧭</div><div class="iab-title">Open in Safari</div><div class="iab-msg">For the best experience — including adding a profile pic and RSVP\'ing — open this in Safari.</div><button class="iab-open-btn" id="iab-copy-btn" onclick="navigator.clipboard.writeText(\'' + currentUrl + '\').then(()=>{document.getElementById(\'iab-copy-btn\').textContent=\'✓ Link Copied!\';document.querySelector(\'.iab-msg\').textContent=\'Now open Safari and paste the link in the address bar.\';}).catch(()=>{document.querySelector(\'.iab-msg\').textContent=\'Copy this link and paste it in Safari: ' + currentUrl + '\'})">Copy Link to Open in Safari</button><span class="iab-dismiss" onclick="this.closest(\'.iab-overlay\').classList.add(\'hide\');setTimeout(()=>this.closest(\'.iab-overlay\').remove(),250)">Continue in Instagram</span></div>';
     overlay.addEventListener('click', function(e) { if (e.target === overlay) { overlay.classList.add('hide'); setTimeout(() => overlay.remove(), 250); } });
     document.body.appendChild(overlay);
   }
