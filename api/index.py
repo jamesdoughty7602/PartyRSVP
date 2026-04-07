@@ -1758,6 +1758,7 @@ MAIN_HTML = r"""<!DOCTYPE html>
     document.getElementById('rsvp-intro').querySelector('p').textContent = '';
     document.getElementById('socials-section').style.display = '';
     buttons.forEach(b => b.disabled = false);
+    refreshMyStatus();
 
     // Submit to server in background
     fetch('/api/rsvp', {
