@@ -209,14 +209,26 @@ def rsvp_page():
             open_inv = cur.fetchone()
         else:
             open_inv = None
+        # If it's a walk-up token, check if someone already used it
+        walkup_used_name = None
+        if open_inv:
+            cur.execute("SELECT name FROM rsvps WHERE source_token = %s LIMIT 1", (invite_token,))
+            used_row = cur.fetchone()
+            if used_row:
+                walkup_used_name = used_row["name"]
         conn.close()
         if guest:
             prefill_script = f'<script>window.__INVITE_NAME={json.dumps(guest["name"])};window.__INVITE_TOKEN={json.dumps(invite_token)};localStorage.setItem("krish_james_party_v2_name",window.__INVITE_NAME);localStorage.setItem("krish_james_party_v2_token",window.__INVITE_TOKEN);</script>'
             html = MAIN_HTML.replace('<head>', '<head>' + prefill_script, 1)
             return make_response(html, 200, {"Content-Type": "text/html; charset=utf-8"})
         if open_inv:
-            walkup_script = f'<script>var _prev=localStorage.getItem("krish_james_party_v2_token");if(_prev!={json.dumps(invite_token)}){{localStorage.removeItem("krish_james_party_v2_name");}}localStorage.setItem("krish_james_party_v2_token",{json.dumps(invite_token)});localStorage.setItem("krish_james_party_v2_walkup",{json.dumps(invite_token)});</script>'
-            html = MAIN_HTML.replace('<head>', '<head>' + walkup_script, 1)
+            if walkup_used_name:
+                # Already used — pre-fill like a normal invite
+                prefill_script = f'<script>window.__INVITE_NAME={json.dumps(walkup_used_name)};window.__INVITE_TOKEN={json.dumps(invite_token)};localStorage.setItem("krish_james_party_v2_name",window.__INVITE_NAME);localStorage.setItem("krish_james_party_v2_token",window.__INVITE_TOKEN);localStorage.setItem("krish_james_party_v2_walkup",{json.dumps(invite_token)});</script>'
+            else:
+                # Unused — blank walk-up form
+                prefill_script = f'<script>var _prev=localStorage.getItem("krish_james_party_v2_token");if(_prev!={json.dumps(invite_token)}){{localStorage.removeItem("krish_james_party_v2_name");}}localStorage.setItem("krish_james_party_v2_token",{json.dumps(invite_token)});localStorage.setItem("krish_james_party_v2_walkup",{json.dumps(invite_token)});</script>'
+            html = MAIN_HTML.replace('<head>', '<head>' + prefill_script, 1)
             return make_response(html, 200, {"Content-Type": "text/html; charset=utf-8"})
     return make_response(MAIN_HTML, 200, {"Content-Type": "text/html; charset=utf-8"})
 
