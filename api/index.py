@@ -2261,7 +2261,7 @@ ADMIN_HTML = r"""<!DOCTYPE html>
     <div class="card">
       <h3>&#128279; Walk-up Invite Links</h3>
       <p style="color:#999;font-size:13px;margin-bottom:14px">Generate a unique link per person. They open it, type their name, and are auto-approved. Generate a new one for each person.</p>
-      <button id="walkup-gen-btn" onclick="generateWalkupLink()" style="padding:9px 18px;background:#222;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:14px">+ Generate New Link</button>
+      <button id="walkup-gen-btn" onclick="generateWalkupLink()" style="padding:9px 18px;background:#222;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:14px;transition:background 0.3s,background-size 0.3s">+ Generate New Link</button>
       <div id="walkup-links-list"></div>
     </div>
 
@@ -2462,13 +2462,30 @@ ADMIN_HTML = r"""<!DOCTYPE html>
   async function generateWalkupLink() {
     const btn = document.getElementById('walkup-gen-btn');
     btn.disabled = true;
-    btn.innerHTML = '<span style="display:inline-block;animation:spin 0.7s linear infinite">⟳</span> Generating...';
+    btn.style.cssText += ';background:linear-gradient(135deg,#ff6b9d,#c44dff,#6e8efb,#4dc9f6);background-size:300% 300%;animation:gradientShift 3s ease infinite';
+    btn.innerHTML = '<span style="display:inline-block;font-size:22px;line-height:1;animation:spin 0.6s linear infinite">⟳</span> Generating...';
     try {
       const res = await fetch('/api/admin/open-invites', { method: 'POST' });
       const data = await res.json();
-      if (data.token) loadWalkupLinks();
+      if (data.token) {
+        // Prepend new link instantly without a second fetch
+        const list = document.getElementById('walkup-links-list');
+        const url = window.location.origin + '/rsvp?invite=' + data.token;
+        const newRow = '<div style="display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid #f0eeeb">'
+          + '<span style="font-size:12px;color:#bbb;flex-shrink:0">Unused</span>'
+          + '<span style="font-size:11px;color:#ccc;font-family:monospace;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">···' + data.token.slice(-10) + '</span>'
+          + '<button onclick="copyOneWalkupLink(\'' + url + '\', this)" style="padding:4px 10px;background:#222;color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer;white-space:nowrap;flex-shrink:0">Copy</button>'
+          + '<button onclick="loadWalkupLinks()" style="padding:4px 8px;background:none;border:none;color:#c0392b;font-size:16px;cursor:pointer;flex-shrink:0" title="Refresh to get delete button">×</button>'
+          + '</div>';
+        if (list.innerHTML.includes('No links')) list.innerHTML = '';
+        list.insertAdjacentHTML('afterbegin', newRow);
+        loadWalkupLinks(); // refresh in background to get proper IDs for delete
+      }
     } catch(e) { showToast('Failed to generate link'); }
     btn.disabled = false;
+    btn.style.cssText = btn.style.cssText.replace(/background:[^;]+;background-size:[^;]+;animation:[^;]+/, '');
+    btn.style.background = '#222';
+    btn.style.animation = '';
     btn.innerHTML = '+ Generate New Link';
   }
 
