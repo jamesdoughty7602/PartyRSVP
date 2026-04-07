@@ -2483,7 +2483,7 @@ ADMIN_HTML = r"""<!DOCTYPE html>
         const nameVal = t.used_by ? t.used_by.replace(/"/g, '&quot;') : '';
         const nameColor = t.used_by ? '#1a7a42' : '#999';
         return '<div style="display:flex;align-items:center;gap:10px;background:#f0eee9;padding:6px 6px 6px 14px;border-radius:100px">'
-          + '<input type="text" value="' + nameVal + '" placeholder="Type their name..." onblur="setWalkupLabel(' + t.id + ', this.value)" onkeydown="if(event.key===\'Enter\')this.blur()" style="width:200px;flex-shrink:0;border:none;background:#fff;border-radius:100px;padding:8px 16px;font-size:16px;font-weight:600;color:' + nameColor + ';outline:none;box-shadow:0 1px 4px rgba(0,0,0,0.07)" oninput="this.style.color=\'#1a1a1a\'">'
+          + '<input type="text" value="' + nameVal + '" placeholder="Type their name..." onblur="setWalkupLabel(' + t.id + ', this.value)" onkeydown="if(event.key===\'Enter\')this.blur()" style="width:200px;flex-shrink:0;border:none;background:#fff;border-radius:100px;padding:8px 16px;font-size:14px;font-weight:500;color:' + nameColor + ';outline:none;box-shadow:0 1px 4px rgba(0,0,0,0.07)" oninput="this.style.color=\'#1a1a1a\'">'
           + '<button onclick="copyOneWalkupLink(\'' + url + '\', this)" style="padding:9px 18px;background:#222;color:#fff;border:none;border-radius:100px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0">Copy Link</button>'
           + '<button onclick="deleteWalkupLink(' + t.id + ', this)" style="background:none;border:none;color:#c0392b;font-size:18px;cursor:pointer;padding:0 6px;font-weight:700;flex-shrink:0">&times;</button>'
           + '</div>';
