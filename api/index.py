@@ -205,17 +205,20 @@ def rsvp_page():
             cur.execute("SELECT name FROM plus_ones WHERE invite_token = %s AND approved = 1", (invite_token,))
             guest = cur.fetchone()
         if not guest:
-            cur.execute("SELECT token FROM open_invites WHERE token = %s", (invite_token,))
+            cur.execute("SELECT token, used_by FROM open_invites WHERE token = %s", (invite_token,))
             open_inv = cur.fetchone()
         else:
             open_inv = None
-        # If it's a walk-up token, check if someone already used it
+        # If it's a walk-up token, check if someone already RSVPd with it, or admin pre-labelled it
         walkup_used_name = None
+        walkup_admin_label = None
         if open_inv:
             cur.execute("SELECT name FROM rsvps WHERE source_token = %s LIMIT 1", (invite_token,))
             used_row = cur.fetchone()
             if used_row:
                 walkup_used_name = used_row["name"]
+            elif open_inv["used_by"]:
+                walkup_admin_label = open_inv["used_by"]
         conn.close()
         if guest:
             prefill_script = f'<script>window.__INVITE_NAME={json.dumps(guest["name"])};window.__INVITE_TOKEN={json.dumps(invite_token)};localStorage.setItem("krish_james_party_v2_name",window.__INVITE_NAME);localStorage.setItem("krish_james_party_v2_token",window.__INVITE_TOKEN);</script>'
@@ -223,8 +226,11 @@ def rsvp_page():
             return make_response(html, 200, {"Content-Type": "text/html; charset=utf-8"})
         if open_inv:
             if walkup_used_name:
-                # Already used — pre-fill like a normal invite
+                # Already RSVPd — locked pre-fill
                 prefill_script = f'<script>window.__INVITE_NAME={json.dumps(walkup_used_name)};window.__INVITE_TOKEN={json.dumps(invite_token)};localStorage.setItem("krish_james_party_v2_name",window.__INVITE_NAME);localStorage.setItem("krish_james_party_v2_token",window.__INVITE_TOKEN);localStorage.setItem("krish_james_party_v2_walkup",{json.dumps(invite_token)});</script>'
+            elif walkup_admin_label:
+                # Admin pre-labelled — editable pre-fill
+                prefill_script = f'<script>localStorage.setItem("krish_james_party_v2_name",{json.dumps(walkup_admin_label)});localStorage.setItem("krish_james_party_v2_token",{json.dumps(invite_token)});localStorage.setItem("krish_james_party_v2_walkup",{json.dumps(invite_token)});</script>'
             else:
                 # Unused — blank walk-up form
                 prefill_script = f'<script>var _prev=localStorage.getItem("krish_james_party_v2_token");if(_prev!={json.dumps(invite_token)}){{localStorage.removeItem("krish_james_party_v2_name");}}localStorage.setItem("krish_james_party_v2_token",{json.dumps(invite_token)});localStorage.setItem("krish_james_party_v2_walkup",{json.dumps(invite_token)});</script>'
@@ -953,6 +959,20 @@ def api_admin_create_open_invite():
     conn.commit()
     conn.close()
     return jsonify({"token": token})
+
+
+@app.route("/api/admin/open-invites/<int:invite_id>", methods=["PATCH"])
+def api_admin_label_open_invite(invite_id):
+    if not check_admin():
+        return jsonify({"error": "Unauthorized"}), 401
+    body = request.get_json(force=True)
+    label = body.get("label", "").strip()
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("UPDATE open_invites SET used_by = %s WHERE id = %s", (label, invite_id))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
 
 
 @app.route("/api/admin/open-invites/<int:invite_id>", methods=["DELETE"])
@@ -1997,13 +2017,23 @@ MAIN_HTML = r"""<!DOCTYPE html>
   async function toggleReact(announcementId, btn) {
     const token = localStorage.getItem('krish_james_party_v2_token');
     if (!token) return;
+    // Optimistic update — instant feedback
+    const wasReacted = btn.classList.contains('reacted');
+    const countEl = btn.querySelector('.react-count');
+    const prevCount = parseInt(countEl.textContent) || 0;
+    btn.classList.toggle('reacted', !wasReacted);
+    countEl.textContent = !wasReacted ? prevCount + 1 : (prevCount - 1 > 0 ? prevCount - 1 : '');
     btn.disabled = true;
     try {
       const res = await fetch('/api/react', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({token, announcement_id: announcementId}) });
       const data = await res.json();
       btn.classList.toggle('reacted', data.reacted);
-      btn.querySelector('.react-count').textContent = data.count > 0 ? data.count : '';
-    } catch(e) {}
+      countEl.textContent = data.count > 0 ? data.count : '';
+    } catch(e) {
+      // Revert on failure
+      btn.classList.toggle('reacted', wasReacted);
+      countEl.textContent = prevCount > 0 ? prevCount : '';
+    }
     btn.disabled = false;
   }
 
@@ -2447,16 +2477,28 @@ ADMIN_HTML = r"""<!DOCTYPE html>
     const list = document.getElementById('walkup-links-list');
     if (!list) return;
     if (!tokens.length) { list.innerHTML = '<div style="font-size:13px;color:#bbb">No links generated yet.</div>'; return; }
-    list.innerHTML = tokens.map(t => {
-      const url = window.location.origin + '/rsvp?invite=' + t.token;
-      const usedBy = t.used_by ? '<span style="font-size:12px;font-weight:600;color:#27ae60;flex-shrink:0">✓ ' + esc(t.used_by) + '</span>' : '<span style="font-size:12px;color:#bbb;flex-shrink:0">Unused</span>';
-      return '<div style="display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid #f0eeeb">'
-        + usedBy
-        + '<span style="font-size:11px;color:#ccc;font-family:monospace;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">···' + t.token.slice(-10) + '</span>'
-        + '<button onclick="copyOneWalkupLink(\'' + url + '\', this)" style="padding:4px 10px;background:#222;color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer;white-space:nowrap;flex-shrink:0">Copy</button>'
-        + '<button onclick="deleteWalkupLink(' + t.id + ', this)" style="padding:4px 8px;background:none;border:none;color:#c0392b;font-size:16px;cursor:pointer;flex-shrink:0" title="Delete">&times;</button>'
-        + '</div>';
-    }).join('');
+    list.innerHTML = '<div style="display:flex;flex-direction:column;gap:8px">'
+      + tokens.map(t => {
+        const url = window.location.origin + '/rsvp?invite=' + t.token;
+        const nameVal = t.used_by ? t.used_by.replace(/"/g, '&quot;') : '';
+        const nameColor = t.used_by ? '#1a7a42' : '#999';
+        return '<div style="display:flex;align-items:center;gap:8px;background:#f0eee9;padding:8px 16px;border-radius:100px">'
+          + '<input type="text" value="' + nameVal + '" placeholder="Type name..." onblur="setWalkupLabel(' + t.id + ', this.value)" onkeydown="if(event.key===\'Enter\')this.blur()" style="flex:1;border:none;background:transparent;font-size:14px;font-weight:500;color:' + nameColor + ';outline:none;min-width:0" oninput="this.style.color=\'#1a1a1a\'">'
+          + '<button onclick="copyOneWalkupLink(\'' + url + '\', this)" style="padding:3px 10px;background:#222;color:#fff;border:none;border-radius:20px;font-size:11px;cursor:pointer;white-space:nowrap;flex-shrink:0">Copy</button>'
+          + '<button onclick="deleteWalkupLink(' + t.id + ', this)" style="background:none;border:none;color:#c0392b;font-size:16px;cursor:pointer;padding:0 2px;font-weight:700;flex-shrink:0">&times;</button>'
+          + '</div>';
+      }).join('')
+      + '</div>';
+  }
+
+  async function setWalkupLabel(id, name) {
+    try {
+      await fetch('/api/admin/open-invites/' + id, {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ label: name.trim() })
+      });
+    } catch(e) {}
   }
 
   async function generateWalkupLink() {
