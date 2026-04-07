@@ -1456,7 +1456,7 @@ MAIN_HTML = r"""<!DOCTYPE html>
   })();
 
   const STORAGE_KEY = 'krish_james_party_v2_name';
-  function getName() { return window.__INVITE_NAME || localStorage.getItem(STORAGE_KEY) || ''; }
+  function getName() { const inp = document.getElementById('name-input'); return window.__INVITE_NAME || localStorage.getItem(STORAGE_KEY) || (inp && inp.value.trim()) || ''; }
   const LETTER_COLORS = {A:'#E74C3C',B:'#E67E22',C:'#F1C40F',D:'#2ECC71',E:'#1ABC9C',F:'#3498DB',G:'#9B59B6',H:'#E91E63',I:'#FF5722',J:'#FF9800',K:'#8BC34A',L:'#00BCD4',M:'#673AB7',N:'#F06292',O:'#D32F2F',P:'#FF7043',Q:'#CDDC39',R:'#26A69A',S:'#42A5F5',T:'#7E57C2',U:'#EC407A',V:'#FF8A65',W:'#66BB6A',X:'#FFD700',Y:'#29B6F6',Z:'#AB47BC'};
   const STATUS_LABELS = { going: 'Going', maybe: 'Maybe', cant_go: "Can't Go" };
   const STATUS_EMOJI = { going: '&#127881;', maybe: '&#129300;', cant_go: '&#128532;' };
