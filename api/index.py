@@ -226,8 +226,8 @@ def rsvp_page():
             return make_response(html, 200, {"Content-Type": "text/html; charset=utf-8"})
         if open_inv:
             if walkup_used_name:
-                # Already RSVPd — locked pre-fill
-                prefill_script = f'<script>window.__INVITE_NAME={json.dumps(walkup_used_name)};window.__INVITE_TOKEN={json.dumps(invite_token)};localStorage.setItem("krish_james_party_v2_name",window.__INVITE_NAME);localStorage.setItem("krish_james_party_v2_token",window.__INVITE_TOKEN);localStorage.setItem("krish_james_party_v2_walkup",{json.dumps(invite_token)});</script>'
+                # Already RSVPd — pre-fill name but only set token if visitor has none or is the original claimant
+                prefill_script = f'<script>window.__INVITE_NAME={json.dumps(walkup_used_name)};localStorage.setItem("krish_james_party_v2_name",window.__INVITE_NAME);(function(){{var _ex=localStorage.getItem("krish_james_party_v2_token");if(!_ex||_ex==={json.dumps(invite_token)}){{localStorage.setItem("krish_james_party_v2_token",{json.dumps(invite_token)});}}localStorage.setItem("krish_james_party_v2_walkup",{json.dumps(invite_token)});}})();</script>'
             elif walkup_admin_label:
                 # Admin pre-labelled — editable pre-fill
                 prefill_script = f'<script>localStorage.setItem("krish_james_party_v2_name",{json.dumps(walkup_admin_label)});localStorage.setItem("krish_james_party_v2_token",{json.dumps(invite_token)});localStorage.setItem("krish_james_party_v2_walkup",{json.dumps(invite_token)});</script>'
@@ -2033,7 +2033,7 @@ MAIN_HTML = r"""<!DOCTYPE html>
 
   async function toggleReact(announcementId, btn) {
     const token = localStorage.getItem('krish_james_party_v2_token');
-    if (!token) return;
+    if (!token || btn.disabled) return;
     // Optimistic update — instant feedback
     const wasReacted = btn.classList.contains('reacted');
     const countEl = btn.querySelector('.react-count');
@@ -2042,14 +2042,21 @@ MAIN_HTML = r"""<!DOCTYPE html>
     countEl.textContent = !wasReacted ? prevCount + 1 : (prevCount - 1 > 0 ? prevCount - 1 : '');
     btn.disabled = true;
     try {
-      const res = await fetch('/api/react', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({token, announcement_id: announcementId}) });
+      const res = await fetch('/api/react', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({token, announcement_id: announcementId}),
+        keepalive: true
+      });
+      if (!res.ok) throw new Error('Server error');
       const data = await res.json();
       btn.classList.toggle('reacted', data.reacted);
       countEl.textContent = data.count > 0 ? data.count : '';
     } catch(e) {
-      // Revert on failure
+      // Revert on failure and tell the user
       btn.classList.toggle('reacted', wasReacted);
       countEl.textContent = prevCount > 0 ? prevCount : '';
+      showToast('Could not save reaction — try again');
     }
     btn.disabled = false;
   }
