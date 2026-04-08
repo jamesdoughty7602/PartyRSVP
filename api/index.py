@@ -911,6 +911,23 @@ def api_admin_post_announcement():
     return jsonify({"ok": True})
 
 
+@app.route("/api/admin/announcement", methods=["PATCH"])
+def api_admin_edit_announcement():
+    if not check_admin():
+        return jsonify({"error": "Unauthorized"}), 401
+    body = request.get_json(force=True)
+    ann_id = body.get("id")
+    message = body.get("message", "").strip()
+    if not ann_id:
+        return jsonify({"error": "ID is required"}), 400
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("UPDATE announcements SET message = %s WHERE id = %s", (message, ann_id))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+
 @app.route("/api/admin/announcement", methods=["DELETE"])
 def api_admin_delete_announcement():
     if not check_admin():
@@ -3104,6 +3121,37 @@ ADMIN_HTML = r"""<!DOCTYPE html>
     } catch (e) { alert('Could not load viewers'); }
   }
 
+  function editAnnouncement(id, currentText) {
+    const textEl = document.getElementById('ann-text-' + id);
+    if (!textEl) return;
+    textEl.innerHTML = '<textarea id="ann-edit-' + id + '" style="width:100%;font-size:14px;line-height:1.5;border:1px solid #c44dff;border-radius:8px;padding:8px;font-family:inherit;resize:vertical;min-height:80px;box-sizing:border-box;outline:none">' + esc(currentText) + '</textarea>'
+      + '<div style="display:flex;gap:8px;margin-top:6px">'
+      + '<button onclick="saveAnnouncementEdit(' + id + ')" style="padding:5px 14px;background:#222;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">Save</button>'
+      + '<button onclick="renderAnnouncements()" style="padding:5px 14px;background:none;border:1px solid #ddd;border-radius:8px;font-size:13px;cursor:pointer;color:#666">Cancel</button>'
+      + '</div>';
+    document.getElementById('ann-edit-' + id).focus();
+  }
+
+  async function saveAnnouncementEdit(id) {
+    const ta = document.getElementById('ann-edit-' + id);
+    if (!ta) return;
+    const message = ta.value.trim();
+    try {
+      const res = await fetch('/api/admin/announcement', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, message })
+      });
+      if (res.ok) {
+        // Update local data so re-render shows new text without full reload
+        const ann = (_adminData.announcements || []).find(a => a.id === id);
+        if (ann) ann.message = message;
+        renderAnnouncements();
+        showToast('✓ Announcement updated');
+      } else { showToast('Failed to save'); }
+    } catch(e) { showToast('Something went wrong'); }
+  }
+
   function renderAnnouncements() {
     if (!_adminData) return;
     const list = document.getElementById('admin-announcements-list');
@@ -3122,7 +3170,8 @@ ADMIN_HTML = r"""<!DOCTYPE html>
       const isVid = a.photo && (a.photo.startsWith('data:video/') || a.photo.match(/\.(mp4|mov|webm)$/i));
       const photoHtml = a.photo ? (isVid ? '<div style="margin-top:8px"><video src="' + a.photo + '" controls playsinline muted style="max-width:200px;border-radius:8px"></video></div>' : '<div style="margin-top:8px"><img src="' + a.photo + '" style="max-width:200px;border-radius:8px"></div>') : '';
       const seenHtml = '<span onclick="showAnnouncementViewers(' + a.id + ')" style="cursor:pointer;color:#3498db;font-size:11px;margin-left:8px" title="Click to see who">&#128065; Seen by ' + (a.view_count || 0) + '</span>';
-      return '<div style="background:#f9f8f6;border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:flex-start;gap:10px"><div style="flex:1">' + photoHtml + '<div style="font-size:14px;line-height:1.5">' + esc(a.message).replace(/\n/g, '<br>') + '</div><div style="font-size:11px;color:#999;margin-top:4px">' + timeStr + seenHtml + '</div></div><button onclick="deleteAnnouncement(' + a.id + ')" style="background:none;border:none;color:#c0392b;font-size:18px;cursor:pointer;padding:0 4px;font-weight:700;flex-shrink:0" title="Delete">&times;</button></div>';
+      const msgJson = JSON.stringify(a.message);
+      return '<div id="ann-row-' + a.id + '" style="background:#f9f8f6;border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:flex-start;gap:10px"><div style="flex:1">' + photoHtml + '<div id="ann-text-' + a.id + '" style="font-size:14px;line-height:1.5">' + esc(a.message).replace(/\n/g, '<br>') + '</div><div style="font-size:11px;color:#999;margin-top:4px">' + timeStr + seenHtml + '</div></div><button onclick="editAnnouncement(' + a.id + ',' + msgJson.replace(/'/g,"&#39;") + ')" style="background:none;border:none;color:#888;font-size:14px;cursor:pointer;padding:0 4px;flex-shrink:0" title="Edit">✏️</button><button onclick="deleteAnnouncement(' + a.id + ')" style="background:none;border:none;color:#c0392b;font-size:18px;cursor:pointer;padding:0 4px;font-weight:700;flex-shrink:0" title="Delete">&times;</button></div>';
     }).join('');
   }
 
