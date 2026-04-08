@@ -1396,6 +1396,11 @@ MAIN_HTML = r"""<!DOCTYPE html>
       </div>
       <div class="error-msg" id="error-msg"></div>
       <div id="status-area"></div>
+      <div id="announcements-section" style="display:none">
+        <hr style="border:none;border-top:1px solid #eee;margin:24px 0">
+        <h3 style="font-size:18px;font-weight:700;margin-bottom:12px">&#128226; Announcements</h3>
+        <div id="announcements-list"></div>
+      </div>
       <div class="socials-section" id="socials-section">
       <div class="socials-header"><h3>Link your socials</h3></div>
       <p class="socials-prompt">Copy &amp; paste your profile links so other guests can find you! (optional)</p>
@@ -1409,11 +1414,6 @@ MAIN_HTML = r"""<!DOCTYPE html>
         <input type="url" class="social-input" id="fb-input" placeholder="https://facebook.com/yourprofile" autocomplete="off">
       </div>
       <button class="save-socials-btn" onclick="saveSocials()">Save Socials</button>
-      </div>
-      <div id="announcements-section" style="display:none">
-        <hr style="border:none;border-top:1px solid #eee;margin:24px 0">
-        <h3 style="font-size:18px;font-weight:700;margin-bottom:12px">&#128226; Announcements</h3>
-        <div id="announcements-list"></div>
       </div>
     </form>
   </div>
