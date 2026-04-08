@@ -211,7 +211,7 @@ def rsvp_page():
             user_reacted = cur.fetchone() is not None
         announcements.append({"id": r["id"], "message": r["message"] or "", "photo": r["photo"] or "",
                                "created_at": str(r["created_at"]) + "+00:00", "reaction_count": rc, "user_reacted": user_reacted})
-    ann_script = f'<script>window.__ANNOUNCEMENTS={json.dumps(announcements)};</script>'
+    ann_script = f'<script>window.__ANNOUNCEMENTS={json.dumps(announcements)};window.__PAGE_TOKEN={json.dumps(invite_token)};</script>'
 
     prefill_script = ''
     if invite_token:
@@ -2043,7 +2043,7 @@ MAIN_HTML = r"""<!DOCTYPE html>
   });
 
   async function toggleReact(announcementId, btn) {
-    const token = localStorage.getItem('krish_james_party_v2_token');
+    const token = window.__PAGE_TOKEN || localStorage.getItem('krish_james_party_v2_token');
     if (!token || btn.disabled) return;
     // Optimistic update — instant feedback
     const wasReacted = btn.classList.contains('reacted');
@@ -2075,7 +2075,7 @@ MAIN_HTML = r"""<!DOCTYPE html>
   function renderAnnouncementList(announcements) {
     const list = document.getElementById('announcements-list');
     const section = document.getElementById('announcements-section');
-    const token = localStorage.getItem('krish_james_party_v2_token');
+    const token = window.__PAGE_TOKEN || localStorage.getItem('krish_james_party_v2_token');
     if (announcements && announcements.length > 0) {
       section.style.display = '';
       list.innerHTML = announcements.map(a => {
