@@ -195,9 +195,26 @@ def check_admin():
 @app.route("/rsvp")
 def rsvp_page():
     invite_token = request.args.get("invite", "").strip()
+    conn = get_db()
+    cur = conn.cursor()
+
+    # Always pre-load announcements so they render instantly (no extra fetch)
+    cur.execute("SELECT id, message, photo, created_at FROM announcements ORDER BY created_at DESC")
+    ann_rows = cur.fetchall()
+    announcements = []
+    for r in ann_rows:
+        cur.execute("SELECT COUNT(*) as cnt FROM announcement_reactions WHERE announcement_id = %s", (r["id"],))
+        rc = cur.fetchone()["cnt"]
+        user_reacted = False
+        if invite_token:
+            cur.execute("SELECT 1 FROM announcement_reactions WHERE announcement_id = %s AND invite_token = %s", (r["id"], invite_token))
+            user_reacted = cur.fetchone() is not None
+        announcements.append({"id": r["id"], "message": r["message"] or "", "photo": r["photo"] or "",
+                               "created_at": str(r["created_at"]) + "+00:00", "reaction_count": rc, "user_reacted": user_reacted})
+    ann_script = f'<script>window.__ANNOUNCEMENTS={json.dumps(announcements)};</script>'
+
+    prefill_script = ''
     if invite_token:
-        conn = get_db()
-        cur = conn.cursor()
         # Check guest_list first, then plus_ones
         cur.execute("SELECT name FROM guest_list WHERE invite_token = %s", (invite_token,))
         guest = cur.fetchone()
@@ -209,7 +226,6 @@ def rsvp_page():
             open_inv = cur.fetchone()
         else:
             open_inv = None
-        # If it's a walk-up token, check if someone already RSVPd with it, or admin pre-labelled it
         walkup_used_name = None
         walkup_admin_label = None
         if open_inv:
@@ -219,24 +235,19 @@ def rsvp_page():
                 walkup_used_name = used_row["name"]
             elif open_inv["used_by"]:
                 walkup_admin_label = open_inv["used_by"]
-        conn.close()
         if guest:
             prefill_script = f'<script>window.__INVITE_NAME={json.dumps(guest["name"])};window.__INVITE_TOKEN={json.dumps(invite_token)};localStorage.setItem("krish_james_party_v2_name",window.__INVITE_NAME);localStorage.setItem("krish_james_party_v2_token",window.__INVITE_TOKEN);</script>'
-            html = MAIN_HTML.replace('<head>', '<head>' + prefill_script, 1)
-            return make_response(html, 200, {"Content-Type": "text/html; charset=utf-8"})
-        if open_inv:
+        elif open_inv:
             if walkup_used_name:
-                # Already RSVPd — pre-fill name but only set token if visitor has none or is the original claimant
                 prefill_script = f'<script>window.__INVITE_NAME={json.dumps(walkup_used_name)};localStorage.setItem("krish_james_party_v2_name",window.__INVITE_NAME);(function(){{var _ex=localStorage.getItem("krish_james_party_v2_token");if(!_ex||_ex==={json.dumps(invite_token)}){{localStorage.setItem("krish_james_party_v2_token",{json.dumps(invite_token)});}}localStorage.setItem("krish_james_party_v2_walkup",{json.dumps(invite_token)});}})();</script>'
             elif walkup_admin_label:
-                # Admin pre-labelled — editable pre-fill
                 prefill_script = f'<script>localStorage.setItem("krish_james_party_v2_name",{json.dumps(walkup_admin_label)});localStorage.setItem("krish_james_party_v2_token",{json.dumps(invite_token)});localStorage.setItem("krish_james_party_v2_walkup",{json.dumps(invite_token)});</script>'
             else:
-                # Unused — blank walk-up form
                 prefill_script = f'<script>var _prev=localStorage.getItem("krish_james_party_v2_token");if(_prev!={json.dumps(invite_token)}){{localStorage.removeItem("krish_james_party_v2_name");}}localStorage.setItem("krish_james_party_v2_token",{json.dumps(invite_token)});localStorage.setItem("krish_james_party_v2_walkup",{json.dumps(invite_token)});</script>'
-            html = MAIN_HTML.replace('<head>', '<head>' + prefill_script, 1)
-            return make_response(html, 200, {"Content-Type": "text/html; charset=utf-8"})
-    return make_response(MAIN_HTML, 200, {"Content-Type": "text/html; charset=utf-8"})
+
+    conn.close()
+    html = MAIN_HTML.replace('<head>', '<head>' + ann_script + prefill_script, 1)
+    return make_response(html, 200, {"Content-Type": "text/html; charset=utf-8"})
 
 
 @app.route("/api/rsvps")
@@ -2061,16 +2072,13 @@ MAIN_HTML = r"""<!DOCTYPE html>
     btn.disabled = false;
   }
 
-  async function loadAnnouncements() {
-    try {
-      const token = localStorage.getItem('krish_james_party_v2_token');
-      const res = await fetch('/api/announcements' + (token ? '?token=' + encodeURIComponent(token) : ''));
-      const data = await res.json();
-      const list = document.getElementById('announcements-list');
-      const section = document.getElementById('announcements-section');
-      if (data.announcements && data.announcements.length > 0) {
-        section.style.display = '';
-        list.innerHTML = data.announcements.map(a => {
+  function renderAnnouncementList(announcements) {
+    const list = document.getElementById('announcements-list');
+    const section = document.getElementById('announcements-section');
+    const token = localStorage.getItem('krish_james_party_v2_token');
+    if (announcements && announcements.length > 0) {
+      section.style.display = '';
+      list.innerHTML = announcements.map(a => {
           const d = new Date(a.created_at);
           const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
           const h = d.getHours(); const m = d.getMinutes();
@@ -2084,17 +2092,28 @@ MAIN_HTML = r"""<!DOCTYPE html>
           const reactBtn = token ? '<button class="react-btn' + reactedClass + '" onclick="toggleReact(' + a.id + ', this)"><span class="react-heart">♥</span><span class="react-count">' + reactCount + '</span></button>' : '';
           return '<div style="background:#fff;border-radius:14px;padding:16px 18px;margin-bottom:12px;border:1px solid #eee;box-shadow:0 2px 8px rgba(0,0,0,0.04)">' + mediaHtml + (a.message ? '<div style="font-size:14px;line-height:1.5;color:#333;word-break:break-word;overflow-wrap:break-word">' + escapeHtml(a.message).replace(/\n/g, '<br>') + '</div>' : '') + '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px"><div style="font-size:11px;color:#aaa">' + timeStr + '</div>' + reactBtn + '</div></div>';
         }).join('');
-        if (token && data.announcements.length > 0) {
-          fetch('/api/mark-seen', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({token: token, announcement_ids: data.announcements.map(a => a.id)})
-          }).catch(() => {});
-        }
-      } else {
-        section.style.display = 'none';
+      if (token && announcements.length > 0) {
+        fetch('/api/mark-seen', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({token: token, announcement_ids: announcements.map(a => a.id)})
+        }).catch(() => {});
       }
-    } catch (e) { console.error('Failed to load announcements', e); }
+    } else {
+      section.style.display = 'none';
+    }
+  }
+
+  async function loadAnnouncements() {
+    // Render instantly from server-embedded data
+    if (window.__ANNOUNCEMENTS) renderAnnouncementList(window.__ANNOUNCEMENTS);
+    // Background refresh to get accurate reaction state
+    try {
+      const token = localStorage.getItem('krish_james_party_v2_token');
+      const res = await fetch('/api/announcements' + (token ? '?token=' + encodeURIComponent(token) : ''));
+      const data = await res.json();
+      if (data.announcements) renderAnnouncementList(data.announcements);
+    } catch (e) {}
   }
 
   const savedName = getName();
