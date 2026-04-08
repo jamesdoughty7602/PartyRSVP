@@ -246,7 +246,7 @@ def rsvp_page():
                 prefill_script = f'<script>var _prev=localStorage.getItem("krish_james_party_v2_token");if(_prev!={json.dumps(invite_token)}){{localStorage.removeItem("krish_james_party_v2_name");}}localStorage.setItem("krish_james_party_v2_token",{json.dumps(invite_token)});localStorage.setItem("krish_james_party_v2_walkup",{json.dumps(invite_token)});</script>'
 
     conn.close()
-    html = MAIN_HTML.replace('<head>', '<head>' + ann_script + prefill_script, 1)
+    html = MAIN_HTML.replace('<!-- INJECT -->', ann_script + prefill_script, 1)
     return make_response(html, 200, {"Content-Type": "text/html; charset=utf-8"})
 
 
@@ -1025,10 +1025,16 @@ MAIN_HTML = r"""<!DOCTYPE html>
 <title>HOUSE PARTY V2</title>
 <meta property="og:title" content="HOUSE PARTY V2 🎉">
 <meta property="og:description" content="You're invited! RSVP for the house party hosted by Krish & James.">
+<meta property="og:url" content="https://partyrsvp.vercel.app/rsvp">
 <meta property="og:image" content="https://partyrsvp.vercel.app/og-image.png">
+<meta property="og:image:secure_url" content="https://partyrsvp.vercel.app/og-image.png">
+<meta property="og:image:type" content="image/png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://partyrsvp.vercel.app/og-image.png">
+<!-- INJECT -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Serif+Display&display=swap" rel="stylesheet">
@@ -2782,7 +2788,7 @@ ADMIN_HTML = r"""<!DOCTYPE html>
   }
 
   function copyLink(url, btnId) {
-    const text = url + "\n\nHey! We're having a party soon! Click the link for all the info, +1's, and to RSVP! Hope you can make it!";
+    const text = url + "\n\nHelloo! We're having a party soon! click the link for all the info, +1's, and to RSVP! hope you can make it!";
     navigator.clipboard.writeText(text).then(() => {
       const btn = document.getElementById(btnId);
       btn.textContent = 'Copied!';
