@@ -2058,7 +2058,7 @@ MAIN_HTML = r"""<!DOCTYPE html>
           const reactedClass = a.user_reacted ? ' reacted' : '';
           const reactCount = a.reaction_count > 0 ? a.reaction_count : '';
           const reactBtn = token ? '<button class="react-btn' + reactedClass + '" onclick="toggleReact(' + a.id + ', this)"><span class="react-heart">♥</span><span class="react-count">' + reactCount + '</span></button>' : '';
-          return '<div style="background:#fff;border-radius:14px;padding:16px 18px;margin-bottom:12px;border:1px solid #eee;box-shadow:0 2px 8px rgba(0,0,0,0.04)">' + mediaHtml + (a.message ? '<div style="font-size:14px;line-height:1.5;color:#333;word-break:break-word;overflow-wrap:break-word">' + escapeHtml(a.message) + '</div>' : '') + '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px"><div style="font-size:11px;color:#aaa">' + timeStr + '</div>' + reactBtn + '</div></div>';
+          return '<div style="background:#fff;border-radius:14px;padding:16px 18px;margin-bottom:12px;border:1px solid #eee;box-shadow:0 2px 8px rgba(0,0,0,0.04)">' + mediaHtml + (a.message ? '<div style="font-size:14px;line-height:1.5;color:#333;word-break:break-word;overflow-wrap:break-word">' + escapeHtml(a.message).replace(/\n/g, '<br>') + '</div>' : '') + '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px"><div style="font-size:11px;color:#aaa">' + timeStr + '</div>' + reactBtn + '</div></div>';
         }).join('');
         if (token && data.announcements.length > 0) {
           fetch('/api/mark-seen', {
@@ -3122,7 +3122,7 @@ ADMIN_HTML = r"""<!DOCTYPE html>
       const isVid = a.photo && (a.photo.startsWith('data:video/') || a.photo.match(/\.(mp4|mov|webm)$/i));
       const photoHtml = a.photo ? (isVid ? '<div style="margin-top:8px"><video src="' + a.photo + '" controls playsinline muted style="max-width:200px;border-radius:8px"></video></div>' : '<div style="margin-top:8px"><img src="' + a.photo + '" style="max-width:200px;border-radius:8px"></div>') : '';
       const seenHtml = '<span onclick="showAnnouncementViewers(' + a.id + ')" style="cursor:pointer;color:#3498db;font-size:11px;margin-left:8px" title="Click to see who">&#128065; Seen by ' + (a.view_count || 0) + '</span>';
-      return '<div style="background:#f9f8f6;border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:flex-start;gap:10px"><div style="flex:1">' + photoHtml + '<div style="font-size:14px;line-height:1.5">' + esc(a.message) + '</div><div style="font-size:11px;color:#999;margin-top:4px">' + timeStr + seenHtml + '</div></div><button onclick="deleteAnnouncement(' + a.id + ')" style="background:none;border:none;color:#c0392b;font-size:18px;cursor:pointer;padding:0 4px;font-weight:700;flex-shrink:0" title="Delete">&times;</button></div>';
+      return '<div style="background:#f9f8f6;border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:flex-start;gap:10px"><div style="flex:1">' + photoHtml + '<div style="font-size:14px;line-height:1.5">' + esc(a.message).replace(/\n/g, '<br>') + '</div><div style="font-size:11px;color:#999;margin-top:4px">' + timeStr + seenHtml + '</div></div><button onclick="deleteAnnouncement(' + a.id + ')" style="background:none;border:none;color:#c0392b;font-size:18px;cursor:pointer;padding:0 4px;font-weight:700;flex-shrink:0" title="Delete">&times;</button></div>';
     }).join('');
   }
 
