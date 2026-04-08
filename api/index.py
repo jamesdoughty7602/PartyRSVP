@@ -2104,16 +2104,9 @@ MAIN_HTML = r"""<!DOCTYPE html>
     }
   }
 
-  async function loadAnnouncements() {
-    // Render instantly from server-embedded data
+  function loadAnnouncements() {
+    // Announcements are pre-embedded server-side with correct user_reacted state — render instantly, no fetch needed
     if (window.__ANNOUNCEMENTS) renderAnnouncementList(window.__ANNOUNCEMENTS);
-    // Background refresh to get accurate reaction state
-    try {
-      const token = localStorage.getItem('krish_james_party_v2_token');
-      const res = await fetch('/api/announcements' + (token ? '?token=' + encodeURIComponent(token) : ''));
-      const data = await res.json();
-      if (data.announcements) renderAnnouncementList(data.announcements);
-    } catch (e) {}
   }
 
   const savedName = getName();
