@@ -197,7 +197,7 @@ def rsvp_page():
     # Redirect social media crawlers to the canonical URL so they always
     # see the same OG metadata regardless of invite token
     ua = (request.headers.get("User-Agent") or "").lower()
-    if any(bot in ua for bot in ("facebookexternalhit", "facebookcatalog", "instagram", "linkedinbot", "twitterbot", "whatsapp")):
+    if any(bot in ua for bot in ("facebookexternalhit", "facebookcatalog", "linkedinbot", "twitterbot", "whatsapp")):
         return make_response(MAIN_HTML, 200, {"Content-Type": "text/html; charset=utf-8"})
 
     invite_token = request.args.get("invite", "").strip()
