@@ -2794,7 +2794,7 @@ ADMIN_HTML = r"""<!DOCTYPE html>
   }
 
   function copyLink(url, btnId) {
-    const text = url + "\n\nHelloo! We're having a party soon! click the link for all the info, +1's, and to RSVP! hope you can make it! you can click the link the rsvp but i also added you on the facebook event :)";
+    const text = url + "\n\nHelloo! We're having a party soon! click the link for all the info, +1's, and to RSVP! hope you can make it! you can click the link the rsvp but I'll also add you to the facebook event :)";
     navigator.clipboard.writeText(text).then(() => {
       const btn = document.getElementById(btnId);
       btn.textContent = 'Copied!';
